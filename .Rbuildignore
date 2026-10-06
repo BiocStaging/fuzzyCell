@@ -1,0 +1,11 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^\.vscode$
+^data-raw$
+^\.github$
+^README\.md$
+^\.lintr$
+^TEST\.qmd$
+^TEST_files$
+^TEST\.html$
+^\.quarto$

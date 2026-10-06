@@ -1,0 +1,57 @@
+Package: scBoot
+Type: Package
+Title: Bootstrap Classification Confidence for Spatial Cell-Type Analysis
+Version: 0.99.0
+Authors@R: person("Shreya", "Rajeshrao", email = "shreya.rajeshrao@sydney.edu.au", role = c("aut", "cre"))
+Description: Cell type labels in spatial single-cell data are
+    uncertain, particularly between closely related subtypes. scBoot estimates
+    a per-cell classification confidence by bootstrapping (multinomial
+    resampling of each cell's counts followed by re-classification) and uses
+    the resulting confidences as soft cell type weights. The weights are
+    propagated through downstream analyses: cell type proportions, the
+    co-localisation statistics and niche identification, each compared to
+    the same analysis using hard labels. Cell types are organised with a user-supplied hierarchy of
+    lineages, groups and subtypes. Helpers for testing against sample-level
+    outcomes and for plotting are included.
+License: GPL (>= 3)
+URL: https://github.com/shreyarajeshrao/scBoot
+BugReports: https://github.com/shreyarajeshrao/scBoot/issues
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+biocViews: Software, Spatial, SingleCell, Classification, Clustering,
+    StatisticalMethod
+Depends: R (>= 4.5.0)
+Imports:
+    BiocGenerics,
+    BiocParallel,
+    callr,
+    data.table,
+    dplyr,
+    e1071,
+    forcats,
+    ggplot2,
+    MASS,
+    methods,
+    pheatmap,
+    randomForest,
+    rlang,
+    spatstat.geom,
+    SpatialExperiment,
+    Statial,
+    stats,
+    SummarizedExperiment,
+    tibble,
+    tidyr,
+    utils
+Suggests:
+    BiocStyle,
+    ggiraph,
+    ggnewscale,
+    knitr,
+    rmarkdown,
+    SpatialDatasets,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+LazyData: true
+Config/testthat/edition: 3
+Config/roxygen2/version: 8.1.0

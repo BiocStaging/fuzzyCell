@@ -1,0 +1,9 @@
+.Rproj.user
+.Rhistory
+.RData
+.DS_Store
+.vscode
+TEST.qmd
+TEST.html
+TEST_files/
+TEST.knit.md
