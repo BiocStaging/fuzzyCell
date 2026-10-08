@@ -1,4 +1,4 @@
-# scBoot
+# stBoot
 
 Bootstrap classification confidence for spatial single-cell cell types, and
 confidence-weighted downstream spatial analyses (proportions, co-localisation,
@@ -15,11 +15,11 @@ BiocManager::install("shreyarajeshrao/scBoot")
 ## Quick start
 
 ```r
-library(scBoot)
+library(stBoot)
 spe = loadAmancherla("pre")      # downloads the heart transplant Xenium data
 data(heartCellTypeTree)
 confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 50)
 res = runColocalisationModels(spe, heartCellTypeTree, confList, "resolution_broad")
 ```
 
-See `vignette("scBoot")` for a full walkthrough.
+See `vignette("stBoot")` for a full walkthrough.

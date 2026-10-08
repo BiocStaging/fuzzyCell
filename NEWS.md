@@ -1,4 +1,4 @@
-# scBoot 0.99.0
+# stBoot 0.99.0
 
 * Initial package, prepared for Bioconductor submission.
 * Bootstrap classification confidence (`bootstrapLineageConfidence()`).

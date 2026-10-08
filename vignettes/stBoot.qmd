@@ -1,0 +1,255 @@
+---
+title: "Confidence-weighted spatial analysis with stBoot"
+author:
+  - name: Shreya Rao
+    affiliation: The University of Sydney
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+    code-tools: true
+knitr:
+  opts_chunk:
+    collapse: true
+    comment: "#>"
+    message: false
+    warning: false
+vignette: >
+  %\VignetteIndexEntry{Confidence-weighted spatial analysis with stBoot}
+  %\VignetteEngine{quarto::html}
+  %\VignetteEncoding{UTF-8}
+---
+
+# Introduction
+
+Spatial single-cell technologies measure the expression of hundreds to thousands of genes in each cell while keeping its position in the tissue. A critical pre-processing step is cell type annotation, in which each cell is assigned a label. This step is error prone; transcripts diffuse out of their cell and are assigned to its neighbours, segmentation boundaries are imperfect, and each cell has few detected transcripts across a limited gene panel, so its expression profile is sparse and noisy. These problems matter most between closely related subtypes, whose profiles overlap to begin with. Despite this, most downstream analyses treat the labels as hard and known. Every cell counts as exactly one cell type, however uncertain its assignment, and this uncertainty carries into the spatial analyses built on the labels, such as cell type proportions, co-localisation and niche identification.
+
+*stBoot* estimates how confident each cell's label is, and carries that confidence through the analysis. For each group of closely related subtypes, it trains a classifier on the original labels and then repeatedly resamples every cell's transcript counts and re-classifies it. The fraction of resamples in which a cell is assigned to a subtype is its **confidence** in that subtype: a cell that keeps the same label under resampling is a confident one, and a cell whose label changes is not. These confidences are used as **soft cell type weights** (a cell contributes to several subtypes in proportion to its confidence, rather than to one), in:
+
+-   cell type proportions
+-   co-localisation of pairs of cell types
+-   niches, defined from the local cell type composition around each cell.
+
+Every analysis can be run twice, once with the original hard labels (*unweighted*) and once with the confidences (*weighted*), and each can be tested against a sample-level outcome. Comparing the two shows where the conclusions depend on the uncertain labels.
+
+## Workflow
+
+The workflow is:
+
+1.  describe the cell type hierarchy with a *cell type tree*, so that stBoot knows which subtypes are easily confused
+2.  bootstrap the classification of each group of related subtypes to get per-cell confidence scores
+3.  run a weighted and unweighted analysis (proportions, co-localisation, or niches) and compare
+
+This vignette follows the workflow on a cellular rejection pre-transplant heart biopsy dataset.
+
+# Installation
+
+```{r install, eval = FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+    install.packages("BiocManager")
+}
+BiocManager::install("stBoot")
+
+# remove later
+devtools::install()
+```
+
+# Example data: heart transplant biopsies
+
+The data are Xenium biopsies from heart transplant patients with cellular rejection (Amancherla et al., 2025), available as `SpatialDatasets::spe_Amancherla_2025()`. `loadAmancherla()` downloads them and prepares them for stBoot: it subsets to one image per patient. Here we use the biopsies taken before transplant (`timing = "pre"`). Each patient's outcome after transplant is stored in `resolution_broad`: the rejection either `"resolved"` or showed `"persistence"`.
+
+```{r data}
+library(stBoot)
+library(SpatialExperiment)
+spe = loadAmancherla("pre")
+spe
+
+# one image (and one outcome) per patient
+imageOutcome = unique(colData(spe)[, c("imageID", "resolution_broad")])
+table(imageOutcome$resolution_broad)
+
+```
+
+Any `SummarizedExperiment` (such as a `SpatialExperiment`) can be used with stBoot as long as it has a `"counts"` assay and the cell metadata columns `cellID`, `imageID`, `cellType`, `x` and `y` in its `colData`. If your columns are named differently, the analysis functions take arguments (such as `cellType` and `imageID`) giving the column names.
+
+# The cell type tree
+
+Annotation confidence is calculated between closely related cell types, so stBoot requires a cell type hierarchy in the format given below:
+
+```{r tree}
+tree = list(
+    "Immune" = list(
+        "T cells" = list(children = c("CD8+ T cells", "CD4+ T cells",
+            "Proliferating T cells", "Treg")),
+        "B lineage" = list(children = c("B cells", "Plasma")),
+        "DC lineage" = list(children = c("cDC1", "cDC2", "pDC",
+            "Proliferating DCs", "mDC")),
+        "Macrophage lineage" = list(children = c("Macrophages",
+            "SPP1+ Macrophages")),
+        "NK",
+        "Mast"),
+    "Mesenchymal" = list(
+        "Fibroblast lineage" = list(children = c("Fibroblasts",
+            "POSTN+ Fibroblasts", "Myofibroblasts")),
+        "Vascular" = list(children = c("Pericytes", "Proliferating pericytes",
+            "vSMCs")),
+        "Cardiomyocytes",
+        "Adipocytes"),
+    "Endothelial lineage" = c("Endothelial", "Activated endothelial",
+        "BMX+ Activated endothelial", "Proliferating endothelial",
+        "Lymphatic endothelial"))
+buildCellTypeMap(tree)$groupsWithChildren
+```
+
+\`stBoot\` accepts cell type hierarchies in the form of a nested list. A group of subtypes that should be refined together is written `list(children = ...)`, for example the T cell subtypes above. Everything else is organisational nesting (lineages such as `"Immune"`) or a plain leaf cell type (such as `"NK"`). `stBoot` will only generate confidence scores for cells that have clearly defined leaf nodes. For instance, it will not generate confidence scores for `NK` or `Mast` cells in the hierarchy above, as they are intermediate nodes.
+
+The same tree is also included in the package as `heartCellTypeTree`.
+
+# Bootstrap confidence
+
+The function `bootstrapLineageConfidence` trains a classifier within each group and repeatedly re-classifies each cell after multinomially resampling its raw transcript counts. A cell's confidence for a subtype is the fraction of resamples in which it was assigned to that subtype. We use 20 resamples to keep the vignette quick, but we encourage using at least 100 bootstraps for your analysis.
+
+Three classification models are available: LDA, SVM and Random Forest. By default, the function uses LDA.
+
+```{r bootstrap, results = "hide"}
+confList = bootstrapLineageConfidence(spe, tree, nBoot = 20, seed = 1)
+```
+
+The result is a list with one table per group, giving every cell's confidence in each subtype of that group.
+
+```{r confhead}
+names(confList)
+head(confList[["T cells"]])
+```
+
+# Cell type proportions
+
+`runProportionsPipeline` compares each cell type's proportion between two outcomes, using the confidences as soft counts (weighted) and the original labels (unweighted). 
+
+```{r props, results = "hide"}
+props = runProportionsPipeline(spe, tree, confList,
+    outcomeCol = "resolution_broad", subject = "subject")
+```
+
+```{r propstables}
+head(props$modelWeighted)
+head(props$modelUnweighted)
+```
+
+For most cell types the two analyses agree. `CD4+ T cells` is one where they do not: the estimated difference in proportion between the outcomes changes direction once the confidences are used.
+
+```{r propscompare}
+cols = c("cellType", "estimate", "p.value", "p.adj")
+subset(props$modelUnweighted, cellType == "CD4+ T cells")[, cols]
+subset(props$modelWeighted, cellType == "CD4+ T cells")[, cols]
+```
+
+We can use `plotProportionBoxplot` to visualise the difference in proportion between our outcome groups, and see how the difference in proportions changes once confidence scores are added.
+
+```{r propsplot, fig.height = 4, fig.width = 5}
+plotProportionBoxplot(props, "CD4+ T cells", spe, "resolution_broad")
+```
+
+The plot is interactive; hovering over the points allows you to identify which samples may be contributing to the biggest changes. One "resolved" sample that shows an increase in the proportion of CD4+ T cells after weighting is `Patient_4_1`. We can take a closer look at this sample.
+
+`plotWeightedLabelSpatial` plots the entire lineage (in this case, the T cell lineage), with each T cell weighted by its CD4+ T cell label confidence. `plotOriginalLabelSpatial` plots the hard labels for the T cell lineage.
+
+```{r imgplots, fig.height = 4, fig.width = 6}
+# plot original T cell lineage cells 
+plotOriginalLabelSpatial(spe, tree, "Patient_4_1", "T cells")
+
+# plot T cells weighted by CD4+ T cell confidence
+plotWeightedSpatial(spe, tree, confList, "Patient_4_1", "T cells", "CD4+ T cells")
+```
+
+Marker expression helps to judge whether the confidences are sensible. Here `CD4` expression is shown for the T cells of this biopsy:
+
+```{r imgmarkers, fig.height = 4, fig.width = 6}
+plotOneMarkerSpatial(spe, "Patient_4_1", "T cells", "CD4", cellTypeTree = tree)
+```
+
+# Proportions relative to the parent group
+
+The proportion of a subtype among all cells can change simply because its whole group changes. `runProportionsRelativeToParentPipeline` instead measures each subtype as a proportion of its group, for example CD4+ T cells among all T cells, and tests that against the outcome in the same way.
+
+```{r relprops, results = "hide"}
+relProps = runProportionsRelativeToParentPipeline(spe, tree, confList,
+    outcomeCol = "resolution_broad", subject = "subject")
+```
+
+```{r relpropstables}
+head(relProps$modelWeighted)
+head(relProps$modelUnweighted)
+```
+
+`CD4+ T cells` again change direction:
+
+```{r relpropscompare}
+rbind(
+    unweighted = subset(relProps$modelUnweighted, cellType == "CD4+ T cells")[, cols],
+    weighted = subset(relProps$modelWeighted, cellType == "CD4+ T cells")[, cols])
+```
+
+```{r relpropsplot, fig.height = 4, fig.width = 5}
+plotProportionBoxplot(relProps, "CD4+ T cells", spe, "resolution_broad")
+```
+
+# Spatial relationships
+
+`runColocalisationModel` measures how strongly every pair of cell types and groups co-localise, and tests each against the outcome. The weighted and unweighted versions are returned side by side. This is the slowest step, so for the vignette we use a subset of six patients per outcome; confidences from the full dataset are reused.
+
+```{r subset}
+# the first six images of each outcome, plus the biopsy plotted above
+byOutcome = split(imageOutcome$imageID, imageOutcome$resolution_broad)
+keep = union("Patient_4_1", unlist(lapply(byOutcome, head, 6)))
+speSub = spe[, spe$imageID %in% keep]
+table(imageOutcome[imageOutcome$imageID %in% keep, "resolution_broad"])
+```
+
+```{r coloc, results = "hide"}
+coloc = runColocalisationModels(speSub, tree, confList,
+    outcomeCol = "resolution_broad", subject = "subject")
+```
+
+```{r colocresults}
+subset(coloc$modelWeighted, from == "CD8+ T cells" & to == "Macrophages")
+subset(coloc$modelUnweighted, from == "CD8+ T cells" & to == "Macrophages")
+```
+
+```{r colocplot, fig.height = 4, fig.width = 5}
+plotMetricBoxplot(coloc, speSub, "CD8+ T cells", "Macrophages",
+    "resolution_broad", metric = "lfunction")
+```
+
+# Niches
+
+Niches are defined by clustering per-cell local co-localisation curves (`runNicheIdentification()`), once with hard labels and once with the weights.
+
+```{r niches, results = "hide"}
+niches = runNicheIdentification(speSub, tree, confList, r = c(20, 50), k = 5)
+```
+
+```{r nichetable}
+table(weighted = niches$nicheWeighted, unweighted = niches$nicheUnweighted)
+```
+
+Niche assignments are stored in the `colData` for the niche plots, and can be tested against the outcome in the same way as the cell types.
+
+```{r nicheplots, fig.height = 4, fig.width = 6}
+speSub$nicheWeighted = niches$nicheWeighted[speSub$cellID]
+nicheCompositionMap(speSub, "nicheWeighted")
+plotNicheSpatial(speSub, "Patient_4_1", "niche1")
+```
+
+```{r nichetest}
+nicheTests = testNicheOutcome(speSub, niches$nicheUnweighted,
+    niches$nicheWeighted, outcomeCol = "resolution_broad", subject = "subject")
+nicheTests$testWeighted
+```
+
+# Session info
+
+```{r sessioninfo, eval = TRUE}
+sessionInfo()
+```

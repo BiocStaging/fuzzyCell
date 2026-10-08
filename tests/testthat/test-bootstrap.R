@@ -89,10 +89,10 @@ test_that("bootstrapLineageConfidence records its settings", {
             seed = 10)))
     settings = attr(conf$Grp, "settings")
     expect_equal(settings[c("nBoot", "nPerClass", "classifier", "ntree",
-        "seed")], list(nBoot = 3, nPerClass = 20, classifier = "lda",
+        "seed")], list(nBoot = 3, nPerClass = 20, classifier = "rf",
         ntree = 500, seed = 11))
     expect_setequal(settings$children, c("A", "B"))
-    expect_true("scBootVersion" %in% names(settings))
+    expect_true("stBootVersion" %in% names(settings))
 })
 
 test_that("bootstrapLineageConfidence requires a SummarizedExperiment", {
@@ -183,23 +183,23 @@ test_that("groups that cannot be bootstrapped are skipped with a message", {
 test_that("checkpointSettingsDiff reports only real differences", {
     stored = list(nBoot = 20, nPerClass = 50, classifier = "rf", ntree = 100,
         seed = 5, children = c("A", "B"))
-    expect_length(scBoot:::checkpointSettingsDiff(stored, stored), 0)
+    expect_length(stBoot:::checkpointSettingsDiff(stored, stored), 0)
     # integer vs numeric is not a difference; child order does not matter
     same = modifyList(stored, list(nBoot = 20L, children = c("B", "A")))
-    expect_length(scBoot:::checkpointSettingsDiff(stored, same), 0)
-    diffs = scBoot:::checkpointSettingsDiff(stored,
+    expect_length(stBoot:::checkpointSettingsDiff(stored, same), 0)
+    diffs = stBoot:::checkpointSettingsDiff(stored,
         modifyList(stored, list(nBoot = 100, classifier = "lda")))
     expect_length(diffs, 2)
     expect_match(diffs[1], "nBoot \\(checkpoint: 20, this call: 100\\)")
     # ntree is ignored unless a random forest is involved
     lda1 = modifyList(stored, list(classifier = "lda", ntree = 100))
     lda2 = modifyList(lda1, list(ntree = 500))
-    expect_length(scBoot:::checkpointSettingsDiff(lda1, lda2), 0)
+    expect_length(stBoot:::checkpointSettingsDiff(lda1, lda2), 0)
     # NULL seeds
-    expect_length(scBoot:::checkpointSettingsDiff(
+    expect_length(stBoot:::checkpointSettingsDiff(
         modifyList(stored, list(seed = NULL)),
         modifyList(stored, list(seed = NULL))), 0)
-    expect_length(scBoot:::checkpointSettingsDiff(stored,
+    expect_length(stBoot:::checkpointSettingsDiff(stored,
         modifyList(stored, list(seed = NULL))), 1)
 })
 

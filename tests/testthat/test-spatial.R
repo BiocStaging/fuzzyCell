@@ -17,6 +17,6 @@ test_that("weighted co-localisation equals unweighted for hard-labelled pairs (f
     cells = annotateCellTypeTree(getCellData(d$spe), d$heartCellTypeTree)
     cells$group[is.na(cells$group)] = cells$cellType[is.na(cells$group)]
     pairs = data.frame(from = "Endothelial", to = "NK")
-    coloc = scBoot:::calcLfuncPerImage(cells, d$confList, pairs, r = 50)
+    coloc = stBoot:::calcLfuncPerImage(cells, d$confList, pairs, r = 50)
     expect_equal(coloc$weighted$colocalisation, coloc$unweighted$colocalisation)
 })

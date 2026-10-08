@@ -13,7 +13,7 @@ bootstrapLineageConfidence(
   seed = 51773,
   checkpointDir = NULL,
   skipGroups = character(0),
-  classifier = c("lda", "svm", "rf"),
+  classifier = c("rf", "lda", "svm"),
   ntree = 500,
   cellType = "cellType",
   cellID = "cellID",
@@ -43,14 +43,14 @@ group is reproducible independently of the others.}
 
 \item{checkpointDir}{If given, each group's result is saved there as
 soon as it finishes, and re-running resumes from existing files. Each
-group then runs in a fresh \code{callr} subprocess, which requires scBoot to
+group then runs in a fresh \code{callr} subprocess, which requires stBoot to
 be installed.}
 
 \item{skipGroups}{Names of groups to leave out of the result.}
 
-\item{classifier}{One of \code{"lda"} (linear discriminant analysis, via
-MASS), \code{"svm"} (support vector machine, via e1071) or \code{"rf"} (random
-forest, via randomForest).}
+\item{classifier}{One of \code{"rf"} (random forest, via randomForest; the
+default), \code{"lda"} (linear discriminant analysis, via MASS) or \code{"svm"}
+(support vector machine, via e1071).}
 
 \item{ntree}{Number of trees; only used when \code{classifier = "rf"}.}
 
@@ -72,7 +72,7 @@ cell's confidence score for that cell type (between 0 and 1, rows summing
 to 1 across the child columns).
 Each data frame also carries a \code{"settings"} attribute recording how it
 was computed (\code{nBoot}, \code{nPerClass}, \code{classifier}, \code{ntree}, the group's
-\code{seed}, its \code{children} and the \code{scBootVersion}), which is also saved in
+\code{seed}, its \code{children} and the \code{stBootVersion}), which is also saved in
 checkpoint files. When resuming from a checkpoint, a message reports
 the stored classifier and any settings that differ from the current call.
 }

@@ -11,7 +11,7 @@ bootstrapClassify(
   nPerClass = 50,
   BPPARAM = BiocParallel::SerialParam(),
   seed = NULL,
-  classifier = c("lda", "svm", "rf"),
+  classifier = c("rf", "lda", "svm"),
   ntree = 500
 )
 }
@@ -36,9 +36,9 @@ backend and number of workers is used.}
 
 \item{seed}{Random seed for reproducibility, or \code{NULL}. Recommended for reproducibility.}
 
-\item{classifier}{One of \code{"lda"} (linear discriminant analysis, via
-MASS), \code{"svm"} (support vector machine, via e1071) or \code{"rf"} (random
-forest, via randomForest).}
+\item{classifier}{One of \code{"rf"} (random forest, via randomForest; the
+default), \code{"lda"} (linear discriminant analysis, via MASS) or \code{"svm"}
+(support vector machine, via e1071).}
 
 \item{ntree}{Number of trees; only used when \code{classifier = "rf"}.}
 }

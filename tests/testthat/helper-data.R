@@ -1,10 +1,10 @@
 ## Heavy tests use the real heart transplant data (SpatialDatasets) and are
-## skipped unless SCBOOT_FULL_TESTS is set, e.g. Sys.setenv(SCBOOT_FULL_TESTS =
+## skipped unless STBOOT_FULL_TESTS is set, e.g. Sys.setenv(STBOOT_FULL_TESTS =
 ## "true"). They are far too slow for Bioconductor's build system.
 skip_unless_full = function() {
     skip_on_bioc()
-    skip_if(!nzchar(Sys.getenv("SCBOOT_FULL_TESTS")),
-        "set SCBOOT_FULL_TESTS=true to run the full-data tests")
+    skip_if(!nzchar(Sys.getenv("STBOOT_FULL_TESTS")),
+        "set STBOOT_FULL_TESTS=true to run the full-data tests")
     skip_if_not_installed("SpatialDatasets")
 }
 
@@ -12,7 +12,7 @@ skip_unless_full = function() {
 .fullData = new.env()
 fullTestData = function() {
     if (is.null(.fullData$spe)) {
-        data(heartCellTypeTree, package = "scBoot", envir = .fullData)
+        data(heartCellTypeTree, package = "stBoot", envir = .fullData)
         .fullData$spe = suppressMessages(loadAmancherla("pre"))
         .fullData$confList = suppressMessages(suppressWarnings(
             bootstrapLineageConfidence(.fullData$spe,

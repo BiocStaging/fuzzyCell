@@ -11,7 +11,7 @@ perImage = function(outcome) {
 
 test_that("runLModels fits a model for two conditions", {
     cells = perImage(rep(c("ctrl", "case"), c(4, 5)))
-    res = scBoot:::runLModels(Lf, cells, "outcome")
+    res = stBoot:::runLModels(Lf, cells, "outcome")
     expect_equal(nrow(res), 1)
     # estimate is the second level (alphabetically: 'ctrl') minus the first
     expect_equal(res$estimate, mean(Lf$colocalisation[1:4]) - mean(Lf$colocalisation[5:9]))
@@ -20,44 +20,44 @@ test_that("runLModels fits a model for two conditions", {
 test_that("runLModels accepts column names that are not syntactic", {
     cells = perImage(rep(c("ctrl", "case"), c(4, 5)))
     names(cells)[2] = "my outcome"
-    expect_equal(nrow(scBoot:::runLModels(Lf, cells, "my outcome")), 1)
+    expect_equal(nrow(stBoot:::runLModels(Lf, cells, "my outcome")), 1)
 })
 
 test_that("outcomes with more than two levels are rejected", {
     cells = perImage(rep(c("low", "mid", "high"), each = 3))
-    expect_error(scBoot:::runLModels(Lf, cells, "outcome"),
+    expect_error(stBoot:::runLModels(Lf, cells, "outcome"),
         "has 3 levels \\(high, low, mid\\)\\. The models currently compare two conditions only\\. Please subset the data to two conditions")
     # a continuous outcome has many levels
-    expect_error(scBoot:::runLModels(Lf, perImage(c(1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5)),
+    expect_error(stBoot:::runLModels(Lf, perImage(c(1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5)),
         "outcome"), "has 9 levels")
 })
 
 test_that("outcomes with fewer than two levels are rejected", {
-    expect_error(scBoot:::runLModels(Lf, perImage(rep("only", 9)), "outcome"),
+    expect_error(stBoot:::runLModels(Lf, perImage(rep("only", 9)), "outcome"),
         "fewer than two levels \\(only only\\)")
-    expect_error(scBoot:::runLModels(Lf, perImage(rep(NA_character_, 9)), "outcome"),
+    expect_error(stBoot:::runLModels(Lf, perImage(rep(NA_character_, 9)), "outcome"),
         "fewer than two levels")
 })
 
 test_that("each image must have a single outcome value", {
     cells = data.frame(imageID = rep(paste0("img", 1:9), each = 2),
         outcome = rep(c("a", "b"), 9))
-    expect_error(scBoot:::runLModels(Lf, cells, "outcome"),
+    expect_error(stBoot:::runLModels(Lf, cells, "outcome"),
         "must have a single value per image, but 9 images have more than one: img1 \\(a, b\\); img2 \\(a, b\\); img3 \\(a, b\\); img4 \\(a, b\\); img5 \\(a, b\\); \\.\\.\\.")
-    expect_error(scBoot:::runLModels(Lf, cells, "outcome"),
+    expect_error(stBoot:::runLModels(Lf, cells, "outcome"),
         "repeated measures and mixed models are not supported. Please make sure there is exactly one outcome value per image, and one image per sample \\(for example one image per patient\\)\\.")
 
     # a missing value alongside one real value is fine
     ok = perImage(rep(c("a", "b"), c(4, 5)))
     ok$outcome[1] = NA
-    expect_no_error(scBoot:::runLModels(Lf, ok, "outcome"))
+    expect_no_error(stBoot:::runLModels(Lf, ok, "outcome"))
 })
 
 test_that("outcomeCol must be a column", {
     cells = perImage(rep(c("a", "b"), c(4, 5)))
-    expect_error(scBoot:::runLModels(Lf, cells, "nope"),
+    expect_error(stBoot:::runLModels(Lf, cells, "nope"),
         "`outcomeCol = \"nope\"` is not a column of the data. Available columns: imageID, outcome")
-    expect_error(scBoot:::runLModels(Lf, cells, c("outcome", "imageID")),
+    expect_error(stBoot:::runLModels(Lf, cells, c("outcome", "imageID")),
         "`outcomeCol` must be a single string")
 })
 
@@ -85,11 +85,11 @@ cells$group[is.na(cells$group)] = cells$cellType[is.na(cells$group)]
 pairs = data.frame(from = "A", to = "B")
 
 test_that("weightBy must be one of both, i or j", {
-    expect_error(scBoot:::calcLfuncPerImage(cells, d$conf, pairs, weightBy = "bth"),
+    expect_error(stBoot:::calcLfuncPerImage(cells, d$conf, pairs, weightBy = "bth"),
         "'arg' should be one of")
-    expect_error(scBoot:::calcKontextualPerImage(cells, d$conf, pairs, d$tree,
+    expect_error(stBoot:::calcKontextualPerImage(cells, d$conf, pairs, d$tree,
         weightBy = "bth"), "'arg' should be one of")
-    expect_no_error(quiet(scBoot:::calcLfuncPerImage(cells, d$conf, pairs,
+    expect_no_error(quiet(stBoot:::calcLfuncPerImage(cells, d$conf, pairs,
         weightBy = "j")))
 })
 
@@ -102,23 +102,23 @@ test_that("smallImages drops images with a side below 2 * r", {
     imgs = rbind(corners("big", 300, 300), corners("narrow", 150, 400),
         corners("short", 400, 150), corners("exact", 200, 200))
     # limit 100: nothing is too small
-    expect_equal(nrow(scBoot:::smallImages(imgs, r = 50)), 0)
+    expect_equal(nrow(stBoot:::smallImages(imgs, r = 50)), 0)
     # limit 200: an image exactly at the limit stays
-    expect_setequal(scBoot:::smallImages(imgs, r = 100)$imageID,
+    expect_setequal(stBoot:::smallImages(imgs, r = 100)$imageID,
         c("narrow", "short"))
     # limit 302: all of them go
-    expect_setequal(scBoot:::smallImages(imgs, r = 151)$imageID,
+    expect_setequal(stBoot:::smallImages(imgs, r = 151)$imageID,
         c("big", "exact", "narrow", "short"))
 })
 
 test_that("dropSmallImages reports what it drops", {
     imgs = rbind(corners("big", 300, 300), corners("narrow", 150, 400),
         corners("fine", 500, 500))
-    expect_message(out <- scBoot:::dropSmallImages(imgs, r = 100),
+    expect_message(out <- stBoot:::dropSmallImages(imgs, r = 100),
         "Dropping 1 of 3 images smaller than 2 x r = 200 units in at least one direction: narrow \\(150 x 400\\)")
     expect_setequal(unique(out$imageID), c("big", "fine"))
-    expect_no_message(scBoot:::dropSmallImages(out, r = 100))
-    expect_error(scBoot:::dropSmallImages(corners("tiny", 50, 50), r = 50),
+    expect_no_message(stBoot:::dropSmallImages(out, r = 100))
+    expect_error(stBoot:::dropSmallImages(corners("tiny", 50, 50), r = 50),
         "All 1 images are smaller than 2 x r = 100 units")
 })
 
@@ -130,7 +130,7 @@ test_that("calcLfuncPerImage drops small images with a message", {
     tiny$y = tiny$y / 3
     withTiny = rbind(cells, tiny)
     # the tiny image is about 100 units wide, so 2 * r = 120 drops it
-    expect_message(res <- suppressWarnings(scBoot:::calcLfuncPerImage(withTiny, d$conf,
+    expect_message(res <- suppressWarnings(stBoot:::calcLfuncPerImage(withTiny, d$conf,
         pairs, r = 60)), "Dropping 1 of 7 images smaller than 2 x r = 120 units")
     expect_false("tiny" %in% res$weighted$imageID)
     expect_setequal(unique(res$weighted$imageID), paste0("img", 1:6))
@@ -160,35 +160,35 @@ subjectCells = function(subjects) {
 
 test_that("one image per subject passes", {
     cells = subjectCells(paste0("p", 1:9))
-    expect_equal(nrow(scBoot:::runLModels(Lf, cells, "outcome", subject = "subject")), 1)
+    expect_equal(nrow(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject")), 1)
     # subject = NULL skips the check
     shared = subjectCells(c("p1", "p1", paste0("p", 3:9)))
-    expect_no_error(scBoot:::runLModels(Lf, shared, "outcome"))
+    expect_no_error(stBoot:::runLModels(Lf, shared, "outcome"))
 })
 
 test_that("several images from one subject are rejected", {
     cells = subjectCells(c("p1", "p1", "p2", "p3", "p3", "p3", paste0("p", 4:6)))
-    expect_error(scBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
+    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
         "`subject = \"subject\"` has more than one image for 2 subjects: p1 \\(img1, img2\\); p3 \\(img4, img5, img6\\)")
-    expect_error(scBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
+    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
         "mixed models are not supported\\)\\. Please keep one image per subject, for example by subsetting to one image per patient")
 })
 
 test_that("an image with more than one subject is rejected", {
     cells = subjectCells(paste0("p", 1:9))
     cells$subject[2] = "other"   # img1 now has two subjects
-    expect_error(scBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
+    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
         "Every image must belong to a single subject, but 1 image has more than one value in the `subject` column 'subject': img1 \\(p1, other\\)")
 })
 
 test_that("missing or unknown subject columns are rejected", {
     cells = subjectCells(paste0("p", 1:9))
     cells$subject[3] = NA
-    expect_error(scBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
+    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
         "has missing values \\(in 1 image: img2\\)")
-    expect_error(scBoot:::runLModels(Lf, cells, "outcome", subject = "patient"),
+    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "patient"),
         "`subject = \"patient\"` is not a column of the data")
-    expect_error(scBoot:::runLModels(Lf, cells, "outcome", subject = c("a", "b")),
+    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = c("a", "b")),
         "`subject` must be a single string")
 })
 

@@ -1,4 +1,4 @@
 library(testthat)
-library(scBoot)
+library(stBoot)
 
-test_check("scBoot")
+test_check("stBoot")

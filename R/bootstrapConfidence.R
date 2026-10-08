@@ -1,6 +1,6 @@
 # Train the chosen classifier on a (already scaled/subset) feature matrix. 
 # ntree only applies to classifier = "rf".
-trainClassifier = function(x, y, classifier = c("lda", "svm", "rf"), ntree = 500) {
+trainClassifier = function(x, y, classifier = c("rf", "lda", "svm"), ntree = 500) {
     classifier = match.arg(classifier)
     y = factor(y)
     switch(classifier,
@@ -13,7 +13,7 @@ trainClassifier = function(x, y, classifier = c("lda", "svm", "rf"), ntree = 500
 # Predict class labels, uniformly as a character vector regardless of classifier
 # type. MASS::lda returns a list ($class among other things), e1071::svm and
 # randomForest::randomForest return the predicted factor directly.
-predictClassifierClass = function(fit, newx, classifier = c("lda", "svm", "rf")) {
+predictClassifierClass = function(fit, newx, classifier = c("rf", "lda", "svm")) {
     classifier = match.arg(classifier)
     switch(classifier,
         lda = as.character(predict(fit, newx)$class),
@@ -45,9 +45,9 @@ predictClassifierClass = function(fit, newx, classifier = c("lda", "svm", "rf"))
 #'   given it is set on `BPPARAM`, and the results are identical whichever
 #'   backend and number of workers is used.
 #' @param seed Random seed for reproducibility, or `NULL`. Recommended for reproducibility.
-#' @param classifier One of `"lda"` (linear discriminant analysis, via
-#'   MASS), `"svm"` (support vector machine, via e1071) or `"rf"` (random
-#'   forest, via randomForest).
+#' @param classifier One of `"rf"` (random forest, via randomForest; the
+#'   default), `"lda"` (linear discriminant analysis, via MASS) or `"svm"`
+#'   (support vector machine, via e1071).
 #' @param ntree Number of trees; only used when `classifier = "rf"`.
 #'
 #' @return A numeric matrix with one row per cell (in the order of
@@ -67,7 +67,7 @@ predictClassifierClass = function(fit, newx, classifier = c("lda", "svm", "rf"))
 #' }
 #' @export
 bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPARAM = BiocParallel::SerialParam(),
-                            seed = NULL, classifier = c("lda", "svm", "rf"), ntree = 500) {
+                            seed = NULL, classifier = c("rf", "lda", "svm"), ntree = 500) {
     classifier = match.arg(classifier)
     labels = as.character(labels)
 
@@ -161,11 +161,11 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
 # results) - that accumulated heap is what gets duplicated into every worker otherwise,
 # ballooning RSS on large lineages.
 bootstrapLineageInSubprocess = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, wd,
-                                         classifier = "lda", ntree = 500) {
+                                         classifier = "rf", ntree = 500) {
     callr::r(
         func = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, classifier, ntree) {
             set.seed(seed)
-            scBoot::bootstrapClassify(countMat, labels,
+            stBoot::bootstrapClassify(countMat, labels,
                 nBoot = nBoot, nPerClass = nPerClass, BPPARAM = BPPARAM,
                 seed = seed, classifier = classifier, ntree = ntree
             )
@@ -269,7 +269,7 @@ checkpointSettingsDiff = function(stored, current) {
 #' @param cellTypeTree A cell type tree, see [cellTypeTree].
 #' @param checkpointDir If given, each group's result is saved there as
 #'   soon as it finishes, and re-running resumes from existing files. Each
-#'   group then runs in a fresh `callr` subprocess, which requires scBoot to
+#'   group then runs in a fresh `callr` subprocess, which requires stBoot to
 #'   be installed.
 #' @param skipGroups Names of groups to leave out of the result.
 #' @param seed Random seed, or `NULL` for no fixed seed. Each group is
@@ -285,7 +285,7 @@ checkpointSettingsDiff = function(stored, current) {
 #'   to 1 across the child columns).
 #'   Each data frame also carries a `"settings"` attribute recording how it
 #'   was computed (`nBoot`, `nPerClass`, `classifier`, `ntree`, the group's
-#'   `seed`, its `children` and the `scBootVersion`), which is also saved in
+#'   `seed`, its `children` and the `stBootVersion`), which is also saved in
 #'   checkpoint files. When resuming from a checkpoint, a message reports
 #'   the stored classifier and any settings that differ from the current call.
 #'
@@ -302,7 +302,7 @@ checkpointSettingsDiff = function(stored, current) {
 bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass = 50,
                                        BPPARAM = BiocParallel::SerialParam(), seed = 51773, checkpointDir = NULL,
                                        skipGroups = character(0),
-                                       classifier = c("lda", "svm", "rf"), ntree = 500,
+                                       classifier = c("rf", "lda", "svm"), ntree = 500,
                                        cellType = "cellType", cellID = "cellID",
                                        assayName = "counts") {
     classifier = match.arg(classifier)
@@ -352,7 +352,7 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
         settings = list(
             nBoot = nBoot, nPerClass = nPerClass, classifier = classifier,
             ntree = ntree, seed = groupSeed, children = unique(labels),
-            scBootVersion = tryCatch(as.character(utils::packageVersion("scBoot")),
+            stBootVersion = tryCatch(as.character(utils::packageVersion("stBoot")),
                 error = function(e) NA_character_)
         )
 

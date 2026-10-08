@@ -16,7 +16,7 @@ A \code{data.frame} with one row per cell.
 Returns \code{colData(spe)} as a \code{data.frame}. For a \code{SpatialExperiment} whose
 coordinates are stored in \code{spatialCoords()} rather than in \code{colData()},
 the coordinates are added as columns \code{x} and \code{y}. The spatial functions in
-scBoot expect \code{cellID}, \code{imageID}, \code{cellType}, \code{x} and \code{y} columns.
+stBoot expect \code{cellID}, \code{imageID}, \code{cellType}, \code{x} and \code{y} columns.
 }
 \examples{
 \donttest{

@@ -1,10 +1,10 @@
-Package: scBoot
+Package: stBoot
 Type: Package
 Title: Bootstrap Classification Confidence for Spatial Cell-Type Analysis
 Version: 0.99.0
-Authors@R: person("Shreya", "Rajeshrao", email = "shreya.rajeshrao@sydney.edu.au", role = c("aut", "cre"))
+Authors@R: person("Shreya", "Rao", email = "shreya.rajeshrao@sydney.edu.au", role = c("aut", "cre"))
 Description: Cell type labels in spatial single-cell data are
-    uncertain, particularly between closely related subtypes. scBoot estimates
+    uncertain, particularly between closely related subtypes. stBoot estimates
     a per-cell classification confidence by bootstrapping (multinomial
     resampling of each cell's counts followed by re-classification) and uses
     the resulting confidences as soft cell type weights. The weights are
@@ -44,14 +44,15 @@ Imports:
     tidyr,
     utils
 Suggests:
-    BiocStyle,
     ggiraph,
     ggnewscale,
     knitr,
-    rmarkdown,
+    quarto,
+    S4Vectors,
     SpatialDatasets,
     testthat (>= 3.0.0)
-VignetteBuilder: knitr
+VignetteBuilder: quarto
+SystemRequirements: quarto
 LazyData: true
 Config/testthat/edition: 3
 Config/roxygen2/version: 8.1.0
