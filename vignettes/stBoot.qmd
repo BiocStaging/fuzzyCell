@@ -102,7 +102,7 @@ tree = list(
 buildCellTypeMap(tree)$groupsWithChildren
 ```
 
-\`stBoot\` accepts cell type hierarchies in the form of a nested list. A group of subtypes that should be refined together is written `list(children = ...)`, for example the T cell subtypes above. Everything else is organisational nesting (lineages such as `"Immune"`) or a plain leaf cell type (such as `"NK"`). `stBoot` will only generate confidence scores for cells that have clearly defined leaf nodes. For instance, it will not generate confidence scores for `NK` or `Mast` cells in the hierarchy above, as they are intermediate nodes.
+\`stBoot\` accepts cell type hierarchies in the form of a nested list. A group of subtypes that should be refined together is written `list(children = ...)`, for example the T cell subtypes above. Everything else is organisational nesting (lineages such as `"Immune"`) or a plain leaf cell type (such as `"NK"`). `stBoot` will only generate confidence scores for cells that have clearly defined leaf nodes. For instance, it will not generate confidence scores for `NK` or `Mast` cells in the hierarchy above, as they are leaf cell types without a group.
 
 The same tree is also included in the package as `heartCellTypeTree`.
 
@@ -110,7 +110,7 @@ The same tree is also included in the package as `heartCellTypeTree`.
 
 The function `bootstrapLineageConfidence` trains a classifier within each group and repeatedly re-classifies each cell after multinomially resampling its raw transcript counts. A cell's confidence for a subtype is the fraction of resamples in which it was assigned to that subtype. We use 20 resamples to keep the vignette quick, but we encourage using at least 100 bootstraps for your analysis.
 
-Three classification models are available: LDA, SVM and Random Forest. By default, the function uses LDA.
+The classifier is ridge multinomial logistic regression by default (`classifier = "logistic"`); `"pcaLogistic"` fits it on the first 50 principal components, which is faster and often more accurate for panels of thousands of genes, and `"rf"`, `"lda"` and `"svm"` are also available. The classifier is trained with the same number of cells of each subtype, which gives every subtype the same prior; `priors = "observed"` instead weights each subtype by its share of the group's cells, so that a cell is not drawn towards a rare subtype only because the subtypes were balanced in training.
 
 ```{r bootstrap, results = "hide"}
 confList = bootstrapLineageConfidence(spe, tree, nBoot = 20, seed = 1)

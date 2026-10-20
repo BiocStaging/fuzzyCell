@@ -1,16 +1,17 @@
 Package: stBoot
 Type: Package
 Title: Bootstrap Classification Confidence for Spatial Cell-Type Analysis
-Version: 0.99.0
+Version: 0.99.1
 Authors@R: person("Shreya", "Rao", email = "shreya.rajeshrao@sydney.edu.au", role = c("aut", "cre"))
 Description: Cell type labels in spatial single-cell data are
     uncertain, particularly between closely related subtypes. stBoot estimates
     a per-cell classification confidence by bootstrapping (multinomial
     resampling of each cell's counts followed by re-classification) and uses
     the resulting confidences as soft cell type weights. The weights are
-    propagated through downstream analyses: cell type proportions, the
-    co-localisation statistics and niche identification, each compared to
-    the same analysis using hard labels. Cell types are organised with a user-supplied hierarchy of
+    propagated through downstream analyses: cell type proportions,
+    co-localisation (spicyR's test, and Statial's Kontextual test for
+    relative co-localisation) and niche identification (lisaClust), each
+    compared to the same analysis using hard labels. Cell types are organised with a user-supplied hierarchy of
     lineages, groups and subtypes. Helpers for testing against sample-level
     outcomes and for plotting are included.
 License: GPL (>= 3)
@@ -31,7 +32,7 @@ Imports:
     ggplot2,
     glmnet,
     irlba,
-    lisaClust,
+    lisaClust (>= 1.21.9),
     MASS,
     Matrix,
     methods,
@@ -39,7 +40,7 @@ Imports:
     randomForest,
     rlang,
     SpatialExperiment,
-    spicyR,
+    spicyR (>= 1.99.32),
     stats,
     SummarizedExperiment,
     tibble,
