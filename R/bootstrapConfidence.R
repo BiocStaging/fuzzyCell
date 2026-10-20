@@ -3,18 +3,27 @@
 # A random forest is grown as 25 sub-forests on the workers of BPPARAM and merged
 # with randomForest::combine(); the number of sub-forests does not depend on the
 # number of workers, so the forest does not either.
-trainClassifier = function(x, y, classifier = c("logistic", "rf", "lda", "svm"), ntree = 500,
-                           BPPARAM = BiocParallel::SerialParam()) {
+trainClassifier = function(x, y, classifier = c("logistic", "pcaLogistic", "rf", "lda", "svm"), ntree = 500,
+                           BPPARAM = BiocParallel::SerialParam(), nPC = 50) {
     classifier = match.arg(classifier)
     y = factor(y)
-    if (classifier == "logistic") {
+    if (classifier %in% c("logistic", "pcaLogistic")) {
+        # pcaLogistic: the cells' first nPC principal components (of the training cells) in place of the genes
+        proj = NULL
+        if (classifier == "pcaLogistic") {
+            k = min(nPC, ncol(x) - 1, nrow(x) - 1)
+            pc = irlba::prcomp_irlba(x, n = k, center = TRUE, scale. = FALSE)
+            proj = list(genes = colnames(x), center = pc$center, rotation = pc$rotation)
+            x = pc$x
+            colnames(x) = paste0("PC", seq_len(ncol(x)))
+        }
         # ridge multinomial logistic regression, the penalty chosen by 3-fold
         # cross-validated deviance; kept as its coefficients
         cv = glmnet::cv.glmnet(x, y, family = "multinomial", alpha = 0, nfolds = 3, type.measure = "deviance")
         co = stats::coef(cv, s = "lambda.min")
         beta = do.call(cbind, lapply(co, function(b) as.numeric(b[-1])))
         colnames(beta) = names(co)
-        return(list(a0 = vapply(co, function(b) b[1], 0), beta = beta, genes = colnames(x)))
+        return(list(a0 = vapply(co, function(b) b[1], 0), beta = beta, genes = colnames(x), proj = proj))
     }
     if (classifier == "rf") {
         sizes = diff(round(seq(0, ntree, length.out = min(25, ntree) + 1)))
@@ -55,10 +64,19 @@ resampleCounts = function(layout) {
 # randomForest::randomForest return the predicted factor directly.
 # logPrior: optional named log class priors added to the classifier's log posterior (its training classes are
 # balanced, so its own prior is uniform).
-predictClassifierClass = function(fit, newx, classifier = c("logistic", "rf", "lda", "svm"), logPrior = NULL) {
+# The linear predictors of a logistic fit (projecting onto its principal components first for pcaLogistic).
+logisticEta = function(fit, newx) {
+    if (!is.null(fit$proj)) {
+        newx = sweep(newx[, fit$proj$genes, drop = FALSE], 2, fit$proj$center) %*% fit$proj$rotation
+        colnames(newx) = fit$genes
+    }
+    sweep(newx[, fit$genes, drop = FALSE] %*% fit$beta, 2, fit$a0, "+")
+}
+
+predictClassifierClass = function(fit, newx, classifier = c("logistic", "pcaLogistic", "rf", "lda", "svm"), logPrior = NULL) {
     classifier = match.arg(classifier)
-    if (classifier == "logistic") {
-        eta = sweep(newx[, fit$genes, drop = FALSE] %*% fit$beta, 2, fit$a0, "+")
+    if (classifier %in% c("logistic", "pcaLogistic")) {
+        eta = logisticEta(fit, newx)
         if (!is.null(logPrior)) eta = sweep(eta, 2, logPrior[colnames(fit$beta)], "+")
         return(colnames(fit$beta)[max.col(eta, ties.method = "first")])
     }
@@ -100,7 +118,8 @@ predictClassifierClass = function(fit, newx, classifier = c("logistic", "rf", "l
 #' @param seed Random seed for reproducibility, or `NULL`. Recommended for reproducibility.
 #' @param classifier One of `"logistic"` (ridge multinomial logistic
 #'   regression, via glmnet, with the penalty chosen by cross-validation; the
-#'   default), `"rf"` (random forest, via randomForest), `"lda"` (linear
+#'   default), `"pcaLogistic"` (the same on the first 50 principal components
+#'   of the training cells, via irlba), `"rf"` (random forest, via randomForest), `"lda"` (linear
 #'   discriminant analysis, via MASS) or `"svm"` (support vector machine, via
 #'   e1071).
 #' @param ntree Number of trees; only used when `classifier = "rf"`.
@@ -126,7 +145,7 @@ predictClassifierClass = function(fit, newx, classifier = c("logistic", "rf", "l
 #' }
 #' @export
 bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPARAM = BiocParallel::SerialParam(),
-                            seed = NULL, classifier = c("logistic", "rf", "lda", "svm"), ntree = 500,
+                            seed = NULL, classifier = c("logistic", "pcaLogistic", "rf", "lda", "svm"), ntree = 500,
                             priors = c("balanced", "observed")) {
     classifier = match.arg(classifier)
     priors = match.arg(priors)
@@ -361,7 +380,7 @@ checkpointSettingsDiff = function(stored, current) {
 bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass = 50,
                                        BPPARAM = BiocParallel::SerialParam(), seed = 51773, checkpointDir = NULL,
                                        skipGroups = character(0),
-                                       classifier = c("logistic", "rf", "lda", "svm"), ntree = 500,
+                                       classifier = c("logistic", "pcaLogistic", "rf", "lda", "svm"), ntree = 500,
                                        priors = c("balanced", "observed"),
                                        cellType = "cellType", cellID = "cellID",
                                        assayName = "counts") {

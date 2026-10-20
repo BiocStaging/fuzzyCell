@@ -1,8 +1,8 @@
 # Class probabilities from a trained classifier, one column per class.
-predictClassifierProb = function(fit, newx, classifier = c("logistic", "rf", "lda")) {
+predictClassifierProb = function(fit, newx, classifier = c("logistic", "pcaLogistic", "rf", "lda")) {
     classifier = match.arg(classifier)
-    if (classifier == "logistic") {
-        eta = sweep(newx[, fit$genes, drop = FALSE] %*% fit$beta, 2, fit$a0, "+")
+    if (classifier %in% c("logistic", "pcaLogistic")) {
+        eta = logisticEta(fit, newx)
         eta = eta - apply(eta, 1, max)
         p = exp(eta)
         return(p / rowSums(p))
@@ -18,7 +18,7 @@ predictClassifierProb = function(fit, newx, classifier = c("logistic", "rf", "ld
 # other folds with balanced classes (as in bootstrapClassify()), so no cell is
 # scored by a classifier that saw it.
 crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed = NULL,
-                            classifier = c("logistic", "rf", "lda"), ntree = 500,
+                            classifier = c("logistic", "pcaLogistic", "rf", "lda"), ntree = 500,
                             priors = c("balanced", "observed"), BPPARAM = BiocParallel::SerialParam()) {
     classifier = match.arg(classifier)
     priors = match.arg(priors)
@@ -67,7 +67,7 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #'
 #' @inheritParams bootstrapLineageConfidence
 #' @param nFolds Number of folds.
-#' @param classifier `"logistic"` (the default), `"rf"` or `"lda"`, as in
+#' @param classifier `"logistic"` (the default), `"pcaLogistic"`, `"rf"` or `"lda"`, as in
 #'   [bootstrapClassify()].
 #' @param priors `"balanced"` (equal priors, as the classifier is trained) or
 #'   `"observed"` (each class weighted by its share of the group's cells).
@@ -86,7 +86,7 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #' }
 #' @export
 crossfitLineageProbabilities = function(spe, cellTypeTree, nFolds = 5, nPerClass = 50, seed = 51773,
-                                        classifier = c("logistic", "rf", "lda"), ntree = 500,
+                                        classifier = c("logistic", "pcaLogistic", "rf", "lda"), ntree = 500,
                                         priors = c("balanced", "observed"), BPPARAM = BiocParallel::SerialParam(),
                                         skipGroups = character(0), cellType = "cellType",
                                         cellID = "cellID", assayName = "counts") {

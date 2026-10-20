@@ -11,7 +11,7 @@ bootstrapClassify(
   nPerClass = 50,
   BPPARAM = BiocParallel::SerialParam(),
   seed = NULL,
-  classifier = c("logistic", "rf", "lda", "svm"),
+  classifier = c("logistic", "pcaLogistic", "rf", "lda", "svm"),
   ntree = 500,
   priors = c("balanced", "observed")
 )
@@ -39,7 +39,8 @@ backend and number of workers is used.}
 
 \item{classifier}{One of \code{"logistic"} (ridge multinomial logistic
 regression, via glmnet, with the penalty chosen by cross-validation; the
-default), \code{"rf"} (random forest, via randomForest), \code{"lda"} (linear
+default), \code{"pcaLogistic"} (the same on the first 50 principal components
+of the training cells, via irlba), \code{"rf"} (random forest, via randomForest), \code{"lda"} (linear
 discriminant analysis, via MASS) or \code{"svm"} (support vector machine, via
 e1071).}
 

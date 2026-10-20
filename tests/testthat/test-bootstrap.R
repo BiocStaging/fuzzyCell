@@ -259,3 +259,12 @@ test_that("observed priors move fewer cells into a rare class", {
     p2 = crossfitClassify(counts, lab, nFolds = 3, seed = 1, priors = "observed")
     expect_lt(sum(p2[, "B"]), sum(p1[, "B"]))
 })
+
+test_that("pcaLogistic classifies on principal components", {
+    d = miniPipelineData()
+    p = suppressMessages(crossfitLineageProbabilities(d$spe, d$tree, nFolds = 3, seed = 1, classifier = "pcaLogistic"))
+    own = ifelse(d$spe$cellType[match(p$G$cellID, d$spe$cellID)] == "A", p$G$A, p$G$B)
+    expect_gt(mean(own > 0.5), 0.7)
+    b = suppressMessages(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 3, seed = 1, classifier = "pcaLogistic"))
+    expect_equal(unname(rowSums(b$G[, c("A", "B")])), rep(1, nrow(b$G)))
+})

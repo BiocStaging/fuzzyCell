@@ -10,7 +10,7 @@ crossfitLineageProbabilities(
   nFolds = 5,
   nPerClass = 50,
   seed = 51773,
-  classifier = c("logistic", "rf", "lda"),
+  classifier = c("logistic", "pcaLogistic", "rf", "lda"),
   ntree = 500,
   priors = c("balanced", "observed"),
   BPPARAM = BiocParallel::SerialParam(),
@@ -35,7 +35,7 @@ smaller than this are up-sampled with replacement.}
 bootstrapped with \code{seed} plus its position in the list of groups, so every
 group is reproducible independently of the others.}
 
-\item{classifier}{\code{"logistic"} (the default), \code{"rf"} or \code{"lda"}, as in
+\item{classifier}{\code{"logistic"} (the default), \code{"pcaLogistic"}, \code{"rf"} or \code{"lda"}, as in
 \code{\link[=bootstrapClassify]{bootstrapClassify()}}.}
 
 \item{ntree}{Number of trees; only used when \code{classifier = "rf"}.}

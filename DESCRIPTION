@@ -30,6 +30,7 @@ Imports:
     forcats,
     ggplot2,
     glmnet,
+    irlba,
     lisaClust,
     MASS,
     Matrix,
