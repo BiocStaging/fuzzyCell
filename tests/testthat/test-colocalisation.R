@@ -1,66 +1,40 @@
 d = miniPipelineData()
 quiet = function(x) suppressWarnings(suppressMessages(x))
 
-## ---- outcome checks ---------------------------------------------------
-Lf = data.frame(imageID = paste0("img", 1:9), from = "A", to = "B",
-    colocalisation = c(1, 2, 3, 4, 5, 6, 7, 8, 9))
-perImage = function(outcome) {
-    data.frame(imageID = rep(paste0("img", 1:9), each = 2),
-        outcome = rep(outcome, each = 2))
+# a confidence list that gives every cell confidence 1 in its own label
+hardConf = function() {
+    g = getCellData(d$spe)
+    g = g[g$cellType %in% c("A", "B"), ]
+    list(G = data.frame(cellID = g$cellID, A = as.numeric(g$cellType == "A"),
+        B = as.numeric(g$cellType == "B")))
 }
 
-test_that("runLModels fits a model for two conditions", {
-    cells = perImage(rep(c("ctrl", "case"), c(4, 5)))
-    res = stBoot:::runLModels(Lf, cells, "outcome")
-    expect_equal(nrow(res), 1)
-    # estimate is the second level (alphabetically: 'ctrl') minus the first
-    expect_equal(res$estimate, mean(Lf$colocalisation[1:4]) - mean(Lf$colocalisation[5:9]))
+## ---- weights -------------------------------------------------------------
+test_that("confidenceWeights gives subtypes their confidences and groups 1", {
+    w = confidenceWeights(d$spe, d$tree, d$conf)
+    expect_setequal(colnames(w), c("A", "B", "C", "G"))
+    expect_equal(nrow(w), ncol(d$spe))
+    inG = d$spe$cellType %in% c("A", "B")
+    expect_equal(unname(rowSums(w[inG, c("A", "B")])), rep(1, sum(inG)))
+    expect_true(all(w[inG, "G"] == 1) && all(w[!inG, "G"] == 0))
+    expect_true(all(w[!inG, "C"] == 1))
+    conf = d$conf$G
+    i = match(conf$cellID, d$spe$cellID)
+    expect_equal(unname(w[i, "A"]), conf$A)
+
+    h = confidenceWeights(d$spe, d$tree, d$conf, weighted = FALSE)
+    expect_true(all(h %in% c(0, 1)))
+    expect_equal(unname(h[cbind(seq_len(nrow(h)), match(d$spe$cellType, colnames(h)))]), rep(1, nrow(h)))
+    expect_equal(confidenceWeights(d$spe, d$tree, hardConf()), h)
 })
 
-test_that("runLModels accepts column names that are not syntactic", {
-    cells = perImage(rep(c("ctrl", "case"), c(4, 5)))
-    names(cells)[2] = "my outcome"
-    expect_equal(nrow(stBoot:::runLModels(Lf, cells, "my outcome")), 1)
+test_that("confidenceWeights needs a confidence for every cell of a group", {
+    conf = d$conf
+    conf$G = conf$G[-1, ]
+    expect_error(confidenceWeights(d$spe, d$tree, conf), "has no confidence for 1 of the group's cells")
 })
 
-test_that("outcomes with more than two levels are rejected", {
-    cells = perImage(rep(c("low", "mid", "high"), each = 3))
-    expect_error(stBoot:::runLModels(Lf, cells, "outcome"),
-        "has 3 levels \\(high, low, mid\\)\\. The models currently compare two conditions only\\. Please subset the data to two conditions")
-    # a continuous outcome has many levels
-    expect_error(stBoot:::runLModels(Lf, perImage(c(1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5)),
-        "outcome"), "has 9 levels")
-})
-
-test_that("outcomes with fewer than two levels are rejected", {
-    expect_error(stBoot:::runLModels(Lf, perImage(rep("only", 9)), "outcome"),
-        "fewer than two levels \\(only only\\)")
-    expect_error(stBoot:::runLModels(Lf, perImage(rep(NA_character_, 9)), "outcome"),
-        "fewer than two levels")
-})
-
-test_that("each image must have a single outcome value", {
-    cells = data.frame(imageID = rep(paste0("img", 1:9), each = 2),
-        outcome = rep(c("a", "b"), 9))
-    expect_error(stBoot:::runLModels(Lf, cells, "outcome"),
-        "must have a single value per image, but 9 images have more than one: img1 \\(a, b\\); img2 \\(a, b\\); img3 \\(a, b\\); img4 \\(a, b\\); img5 \\(a, b\\); \\.\\.\\.")
-    expect_error(stBoot:::runLModels(Lf, cells, "outcome"),
-        "repeated measures and mixed models are not supported. Please make sure there is exactly one outcome value per image, and one image per sample \\(for example one image per patient\\)\\.")
-
-    # a missing value alongside one real value is fine
-    ok = perImage(rep(c("a", "b"), c(4, 5)))
-    ok$outcome[1] = NA
-    expect_no_error(stBoot:::runLModels(Lf, ok, "outcome"))
-})
-
-test_that("outcomeCol must be a column", {
-    cells = perImage(rep(c("a", "b"), c(4, 5)))
-    expect_error(stBoot:::runLModels(Lf, cells, "nope"),
-        "`outcomeCol = \"nope\"` is not a column of the data. Available columns: imageID, outcome")
-    expect_error(stBoot:::runLModels(Lf, cells, c("outcome", "imageID")),
-        "`outcomeCol` must be a single string")
-})
-
+## ---- outcome and subject checks --------------------------------------------
 test_that("runColocalisationModels checks the outcome before computing anything", {
     spe = d$spe
     spe$three = c(a = "a", a = "a", b = "b", b = "b", c = "c", c = "c")[
@@ -79,140 +53,20 @@ test_that("runColocalisationModels checks the outcome before computing anything"
         "must have a single value per image")
 })
 
-## ---- weightBy ---------------------------------------------------------
-cells = annotateCellTypeTree(getCellData(d$spe), d$tree)
-cells$group[is.na(cells$group)] = cells$cellType[is.na(cells$group)]
-pairs = data.frame(from = "A", to = "B")
-
-test_that("weightBy must be one of both, i or j", {
-    expect_error(stBoot:::calcLfuncPerImage(cells, d$conf, pairs, weightBy = "bth"),
-        "'arg' should be one of")
-    expect_error(stBoot:::calcKontextualPerImage(cells, d$conf, pairs, d$tree,
-        weightBy = "bth"), "'arg' should be one of")
-    expect_no_error(quiet(stBoot:::calcLfuncPerImage(cells, d$conf, pairs,
-        weightBy = "j")))
-})
-
-## ---- images that are too small ---------------------------------------
-corners = function(id, w, h) {
-    data.frame(imageID = id, x = c(0, w), y = c(0, h))
-}
-
-test_that("smallImages drops images with a side below 2 * r", {
-    imgs = rbind(corners("big", 300, 300), corners("narrow", 150, 400),
-        corners("short", 400, 150), corners("exact", 200, 200))
-    # limit 100: nothing is too small
-    expect_equal(nrow(stBoot:::smallImages(imgs, r = 50)), 0)
-    # limit 200: an image exactly at the limit stays
-    expect_setequal(stBoot:::smallImages(imgs, r = 100)$imageID,
-        c("narrow", "short"))
-    # limit 302: all of them go
-    expect_setequal(stBoot:::smallImages(imgs, r = 151)$imageID,
-        c("big", "exact", "narrow", "short"))
-})
-
-test_that("dropSmallImages reports what it drops", {
-    imgs = rbind(corners("big", 300, 300), corners("narrow", 150, 400),
-        corners("fine", 500, 500))
-    expect_message(out <- stBoot:::dropSmallImages(imgs, r = 100),
-        "Dropping 1 of 3 images smaller than 2 x r = 200 units in at least one direction: narrow \\(150 x 400\\)")
-    expect_setequal(unique(out$imageID), c("big", "fine"))
-    expect_no_message(stBoot:::dropSmallImages(out, r = 100))
-    expect_error(stBoot:::dropSmallImages(corners("tiny", 50, 50), r = 50),
-        "All 1 images are smaller than 2 x r = 100 units")
-})
-
-test_that("calcLfuncPerImage drops small images with a message", {
-    tiny = cells[cells$imageID == "img1", ]
-    tiny$imageID = "tiny"
-    tiny$cellID = paste0("t_", tiny$cellID)
-    tiny$x = tiny$x / 3
-    tiny$y = tiny$y / 3
-    withTiny = rbind(cells, tiny)
-    # the tiny image is about 100 units wide, so 2 * r = 120 drops it
-    expect_message(res <- suppressWarnings(stBoot:::calcLfuncPerImage(withTiny, d$conf,
-        pairs, r = 60)), "Dropping 1 of 7 images smaller than 2 x r = 120 units")
-    expect_false("tiny" %in% res$weighted$imageID)
-    expect_setequal(unique(res$weighted$imageID), paste0("img", 1:6))
-})
-
-test_that("runColocalisationModels reports dropped images once", {
-    tiny = d$spe[, d$spe$imageID == "img1"]
-    SpatialExperiment::spatialCoords(tiny) =
-        SpatialExperiment::spatialCoords(tiny) / 3
-    tiny$imageID = "tiny"
-    colnames(tiny) = paste0("t_", colnames(tiny))
-    tiny$cellID = colnames(tiny)
-    spe = BiocGenerics::cbind(d$spe, tiny)
-    msgs = testthat::capture_messages(
-        res <- suppressWarnings(runColocalisationModels(spe, d$tree, d$conf, "outcome",
-            r = 60)))
-    expect_equal(sum(grepl("Dropping", msgs)), 1)
-    expect_false("tiny" %in% res$weighted$imageID)
-})
-
-## ---- subject: one image per subject ---------------------------------------
-subjectCells = function(subjects) {
-    cells = perImage(rep(c("ctrl", "case"), c(4, 5)))
-    cells$subject = rep(subjects, each = 2)
-    cells
-}
-
-test_that("one image per subject passes", {
-    cells = subjectCells(paste0("p", 1:9))
-    expect_equal(nrow(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject")), 1)
-    # subject = NULL skips the check
-    shared = subjectCells(c("p1", "p1", paste0("p", 3:9)))
-    expect_no_error(stBoot:::runLModels(Lf, shared, "outcome"))
-})
-
-test_that("several images from one subject are rejected", {
-    cells = subjectCells(c("p1", "p1", "p2", "p3", "p3", "p3", paste0("p", 4:6)))
-    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
-        "`subject = \"subject\"` has more than one image for 2 subjects: p1 \\(img1, img2\\); p3 \\(img4, img5, img6\\)")
-    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
-        "mixed models are not supported\\)\\. Please keep one image per subject, for example by subsetting to one image per patient")
-})
-
-test_that("an image with more than one subject is rejected", {
-    cells = subjectCells(paste0("p", 1:9))
-    cells$subject[2] = "other"   # img1 now has two subjects
-    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
-        "Every image must belong to a single subject, but 1 image has more than one value in the `subject` column 'subject': img1 \\(p1, other\\)")
-})
-
-test_that("missing or unknown subject columns are rejected", {
-    cells = subjectCells(paste0("p", 1:9))
-    cells$subject[3] = NA
-    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "subject"),
-        "has missing values \\(in 1 image: img2\\)")
-    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = "patient"),
-        "`subject = \"patient\"` is not a column of the data")
-    expect_error(stBoot:::runLModels(Lf, cells, "outcome", subject = c("a", "b")),
-        "`subject` must be a single string")
-})
-
-test_that("runColocalisationModels checks subjects before computing anything", {
+test_that("images of one subject are combined; an image needs a single subject", {
     spe = d$spe
-    # images 1 and 2 are from the same patient
-    spe$patient = paste0("p", rep(c(1, 1, 2, 3, 4, 5), each = 70))
-    msgs = testthat::capture_messages(
-        expect_error(runColocalisationModels(spe, d$tree, d$conf, "outcome",
-            subject = "patient"), "has more than one image for 1 subject: p1 \\(img1, img2\\)"))
-    expect_false(any(grepl("Generating comparisons|Computing", msgs)))
+    spe$patient = paste0("p", rep(c(1, 1, 2, 3, 4, 4), each = 70))
+    res = quiet(runColocalisationModels(spe, d$tree, d$conf, "outcome", subject = "patient"))
+    expect_true(nrow(res$modelWeighted) > 0)
 
-    expect_error(runColocalisationModels(spe, d$tree, d$conf, "outcome",
-        subject = "nope"), "is not a column of colData\\(spe\\)")
-
-    # one image per subject: runs, and without the 'not checked' message
-    spe$patient = paste0("p", rep(1:6, each = 70))
-    msgs = testthat::capture_messages(
-        res <- suppressWarnings(runColocalisationModels(spe, d$tree, d$conf, "outcome",
-            subject = "patient")))
-    expect_false(any(grepl("`subject` was not given", msgs)))
-    expect_named(res, c("weighted", "unweighted", "modelWeighted",
-        "modelUnweighted", "relativeWeighted", "relativeUnweighted",
-        "modelRelativeWeighted", "modelRelativeUnweighted"))
+    spe$patient[2] = "other"
+    expect_error(runColocalisationModels(spe, d$tree, d$conf, "outcome", subject = "patient"),
+        "Every image must belong to a single subject")
+    spe$patient[2] = NA
+    expect_error(runColocalisationModels(spe, d$tree, d$conf, "outcome", subject = "patient"),
+        "has missing values")
+    expect_error(runColocalisationModels(spe, d$tree, d$conf, "outcome", subject = "nope"),
+        "is not a column of colData\\(spe\\)")
 })
 
 test_that("runColocalisationModels says when subject was not given", {
@@ -221,19 +75,37 @@ test_that("runColocalisationModels says when subject was not given", {
     expect_equal(sum(grepl("`subject` was not given", msgs)), 1)
 })
 
-test_that("images dropped as too small do not count against a subject", {
-    # img7 is a tiny second image from patient p1
-    tiny = d$spe[, d$spe$imageID == "img1"]
-    SpatialExperiment::spatialCoords(tiny) =
-        SpatialExperiment::spatialCoords(tiny) / 3
-    tiny$imageID = "tiny"
-    colnames(tiny) = paste0("t_", colnames(tiny))
-    tiny$cellID = colnames(tiny)
-    spe = BiocGenerics::cbind(d$spe, tiny)
-    spe$patient = paste0("p", c(rep(1:6, each = 70), rep(1, 70)))
-    expect_no_error(suppressWarnings(suppressMessages(
-        runColocalisationModels(spe, d$tree, d$conf, "outcome", subject = "patient",
-            r = 60))))
+## ---- results -----------------------------------------------------------------
+test_that("runColocalisationModels returns tests, per-image effects and the spicyR results", {
+    res = quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome"))
+    expect_named(res, c("weighted", "unweighted", "modelWeighted",
+        "modelUnweighted", "relativeWeighted", "relativeUnweighted",
+        "modelRelativeWeighted", "modelRelativeUnweighted", "spicy"))
+    expect_true(all(c("from", "to", "estimate", "se", "p.value", "p.adj", "side") %in% names(res$modelWeighted)))
+    expect_true(all(c("from", "to", "parent", "estimate", "p.value") %in% names(res$modelRelativeWeighted)))
+    # no label is paired with itself or with a group that contains it
+    pairs = paste(res$modelWeighted$from, res$modelWeighted$to)
+    expect_false(any(c("A A", "A G", "G A", "B G") %in% pairs))
+    # (a group with the only other cell type leaves no randomness under the null: not tested)
+    expect_true(all(c("A B", "A C", "B C", "C A") %in% pairs))
+    expect_true(all(c("imageID", "from", "to", "colocalisation") %in% names(res$weighted)))
+})
+
+test_that("confidence 1 in the original labels gives the unweighted results", {
+    res = quiet(runColocalisationModels(d$spe, d$tree, hardConf(), "outcome"))
+    expect_equal(res$modelWeighted, res$modelUnweighted)
+    expect_equal(res$modelRelativeWeighted, res$modelRelativeUnweighted)
+})
+
+test_that("the unweighted test is spicyR's test of the cell types", {
+    res = quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome"))
+    cells = getCellData(d$spe)
+    direct = quiet(spicyR::spicy(cells, condition = "outcome", r = 50, from = "A", to = c("B", "C")))
+    tab = direct$cellResults
+    m = res$modelUnweighted[res$modelUnweighted$from == "A" & res$modelUnweighted$to %in% c("B", "C"), ]
+    m = m[match(tab$to, m$to), ]
+    expect_equal(m$estimate, tab$excess_difference)
+    expect_equal(m$p.value, tab$p_value)
 })
 
 ## ---- other arguments and column names -----------------------------------------

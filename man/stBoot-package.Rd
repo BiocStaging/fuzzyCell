@@ -17,11 +17,11 @@ Useful links:
 
 }
 \author{
-\strong{Maintainer}: Shreya Rajeshrao \email{shreya.rajeshrao@sydney.edu.au}
+\strong{Maintainer}: Shreya Rao \email{shreya.rajeshrao@sydney.edu.au}
 
 Authors:
 \itemize{
-  \item Shreya Rajeshrao \email{shreya.rajeshrao@sydney.edu.au}
+  \item Shreya Rao \email{shreya.rajeshrao@sydney.edu.au}
 }
 
 }

@@ -5,6 +5,7 @@ export(autoParentOverrides)
 export(bootstrapClassify)
 export(bootstrapLineageConfidence)
 export(buildCellTypeMap)
+export(confidenceWeights)
 export(getCellData)
 export(loadAmancherla)
 export(loadCheckpointedConfList)
@@ -30,12 +31,6 @@ import(ggplot2)
 importFrom(SummarizedExperiment,
   assay,
   colData
-)
-importFrom(data.table,
-  ":=",
-  .N,
-  as.data.table,
-  dcast
 )
 importFrom(methods,is)
 importFrom(rlang,.data)

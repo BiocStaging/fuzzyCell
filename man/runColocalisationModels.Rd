@@ -10,11 +10,11 @@ runColocalisationModels(
   confList,
   outcomeCol,
   r = 50,
-  BPPARAM = BiocParallel::SerialParam(),
-  weightBy = c("both", "i", "j"),
+  subject = NULL,
+  effect = c("allocation", "count"),
+  cores = 1,
   parentOverrides = character(0),
   autoOverrideParents = TRUE,
-  subject = NULL,
   cellType = "cellType",
   cellID = "cellID",
   imageID = "imageID",
@@ -25,46 +25,35 @@ runColocalisationModels(
 \arguments{
 \item{spe}{A \code{SummarizedExperiment} (e.g. \code{SpatialExperiment}) with a
 cell ID, cell type, image and coordinates for every cell (see
-\code{\link[=getCellData]{getCellData()}}). Images whose smaller side is below \code{2 * r} are dropped,
-with a message listing them.}
+\code{\link[=getCellData]{getCellData()}}).}
 
 \item{cellTypeTree}{A cell type tree, see \link{cellTypeTree}.}
 
 \item{confList}{Confidence list from \code{\link[=bootstrapLineageConfidence]{bootstrapLineageConfidence()}}.}
 
 \item{outcomeCol}{Name of the \code{colData(spe)} column with the per-image
-outcome. It must have exactly two levels (subset your data to two
-conditions first) and a single value per image: each image is modelled as
-one independent observation, so repeated measures and mixed models are
-not supported. An error is raised otherwise, before any computation.}
+outcome. It must have exactly two levels and a single value per image.}
 
 \item{r}{Radius within which cells count as neighbours, in the units of the
 coordinates; a single positive number.}
 
-\item{BPPARAM}{A \link[BiocParallel:BiocParallelParam-class]{BiocParallel::BiocParallelParam} object saying how
-to run the per-image computations in parallel, for example
-\code{\link[BiocParallel:MulticoreParam]{BiocParallel::MulticoreParam()}}. The default runs serially.}
+\item{subject}{Name of the \code{colData(spe)} column identifying the subject (for
+example the patient) each image comes from. Images of one subject are
+combined, and subjects are the units of the test. With \code{NULL} every image is
+its own subject.}
 
-\item{weightBy}{Which cell in each pair carries a soft weight: \code{"both"},
-\code{"i"} (the from cell) or \code{"j"} (the to cell).}
+\item{effect}{\code{"allocation"} or \code{"count"}, see Details.}
+
+\item{cores}{Number of threads.}
 
 \item{parentOverrides}{Named character vector mapping a \code{to} label to the
 ancestor node (a group, wrapper or lineage in \code{cellTypeTree}) that
 relative co-localisation should compare against instead of the label's
-own group, for
-example \code{c("Fibroblast lineage" = "Mesenchymal")}.}
+own group, for example \code{c("Fibroblast lineage" = "Mesenchymal")}.}
 
 \item{autoOverrideParents}{Whether to add overrides found by
 \code{\link[=autoParentOverrides]{autoParentOverrides()}}. Use \code{FALSE} to condition only on the parents you
 list in \code{parentOverrides}.}
-
-\item{subject}{Name of the \code{colData(spe)} column identifying the subject
-(for example the patient) each image comes from. Several images from the
-same subject are not independent, so when \code{subject} is given the images
-and subjects must map one-to-one: an error is raised if an image has more
-than one subject or a subject has more than one image, and you should keep
-one image per subject. With \code{NULL} (the default) this cannot be checked,
-and a message says so.}
 
 \item{cellType, cellID, imageID}{Names of the \code{colData(spe)} columns holding
 each cell's cell type label, a unique cell ID (matching the \code{cellID}
@@ -75,54 +64,48 @@ column of \code{confList}), and the image it is in.}
 defaults \code{"x"} and \code{"y"} refer to its first two coordinates.}
 }
 \value{
-A list with \code{weighted}, \code{unweighted}, \code{relativeWeighted} and
-\code{relativeUnweighted} (per image and pair), and \code{modelWeighted},
-\code{modelUnweighted}, \code{modelRelativeWeighted} and
-\code{modelRelativeUnweighted} (one linear model per pair). In the models,
-\code{estimate} is the difference in co-localisation for the second level of the
-outcome compared with the first (alphabetical order for text, factor order for
-factors). The per-image results have columns \code{imageID}, \code{from}, \code{to} and
-\code{colocalisation} (and \code{parent} for the relative version), whatever the
-columns of \code{spe} are called.
+A list with the tests \code{modelWeighted}, \code{modelUnweighted},
+\code{modelRelativeWeighted} and \code{modelRelativeUnweighted} (one row per pair:
+\code{estimate}, the difference for the second level of the outcome compared with
+the first, its \code{se}, \code{statistic}, \code{p.value} and BH-adjusted \code{p.adj}, and for
+co-localisation the \code{side}, \code{"attract"} or \code{"avoid"}), the per-image effects
+\code{weighted}, \code{unweighted}, \code{relativeWeighted} and \code{relativeUnweighted}
+(columns \code{imageID}, \code{from}, \code{to}, \code{colocalisation}, and \code{parent} for the
+relative version), and the spicyR results themselves (\code{spicy}, a list of
+\code{weighted}, \code{unweighted}, \code{relativeWeighted} and \code{relativeUnweighted}), for
+spicyR's plotting functions.
 }
 \description{
-Measures, in each image and for every pair of leaf cell types and groups,
-how strongly the cells of one type are attracted to or avoid the cells of the
-other (co-localisation), both with hard (original-label) membership and with
-bootstrap-confidence (soft) membership, then fits a linear model of each
-measure against an outcome. A second measure, relative co-localisation,
-compares the co-localisation with a parent population.
+Tests, for every pair of leaf cell types and groups, whether the
+co-localisation of the two differs between the two conditions of an outcome,
+once with the original labels and once with the bootstrap confidences as soft
+cell type weights. The tests are those of spicyR (\code{spicyR::spicy()}), and the
+relative co-localisation is Statial's Kontextual test
+(\code{spicyR::kontextualEngine()}).
 }
 \details{
-Co-localisation measures, for a pair of labels in an image, how strongly the
-\code{from} cells are attracted to (positive values) or avoid (negative values)
-the \code{to} cells within radius \code{r}; 0 means no attraction or repulsion. It is
-the cross-type L-function. The unweighted version uses the original cell
-type labels; the weighted version uses the bootstrap confidences as soft
-membership weights. Cells near the image border are edge corrected, as in
-Statial. Cell counts include cells with no neighbour within \code{r}, which
-Statial leaves out; this matters in sparse images, where leaving them out
-biases the result towards attraction. As in Statial, the normalising
-constant is the product of the two cell counts, so for pairs whose from and
-to cells overlap (for example a cell type with itself) the result is biased
-slightly downwards, by about \verb{-r / (2n)} for \code{n} cells.
+Co-localisation of a pair \code{from} -> \code{to} is, by default, the extra fraction of
+\code{to} cells with a \code{from} cell within radius \code{r}, beyond the \code{to} labels being a
+random choice among the cells that are not \code{from} cells (\code{effect = "allocation"}); \code{effect = "count"} gives the extra number of \code{from} cells within
+\code{r} of each \code{to} cell. Images are combined within subjects and the conditions
+compared by spicyR's frailty model with a cluster-robust variance, with
+subjects as the units.
 
-Relative co-localisation measures co-localisation relative to a parent
-population, so that attraction that only arises because both cell types
-prefer the same region is not counted. It follows the Kontextual method of
-Statial, and on images without isolated cells the unweighted results equal
-those of Statial's \code{Kontextual()}. By default the parent of a \code{to} cell type
-is its own group.
+With weights (see \code{\link[=confidenceWeights]{confidenceWeights()}}), a cell of a bootstrapped group
+belongs to each subtype of the group with its bootstrap confidence. A \code{to} cell
+counts with its weight, and its chance of having a \code{from} neighbour is computed
+as if the labels of its neighbours were drawn from their confidences (for the
+count, it is the summed \code{from} confidence of its neighbours). Under the null
+hypothesis the \code{to} weights are shuffled over the cells, which gives the
+expected value and variance of each image's statistic. With the original labels
+(weights of 0 and 1) this is spicyR's own test.
 
-Every pair of labels is compared in both directions: group with group, group
-with cell type, and cell type with cell type, where the groups are those
-bootstrapped in \code{confList}. Relative co-localisation only has results for
-pairs whose \code{to} has a parent other than itself (by default its own group).
-Pairs whose \code{to} is a group or an ungrouped cell type are therefore absent
-from the \verb{relative*} results and models, not \code{NA}, unless
-\code{autoOverrideParents} supplies a broader parent for them (see
-\code{\link[=autoParentOverrides]{autoParentOverrides()}}). Parents given in \code{parentOverrides} take precedence
-over automatically found ones for the same label.
+Relative co-localisation compares the co-localisation of \code{from} with \code{to} to
+that of \code{from} with a parent population of \code{to}, so that attraction that only
+arises because both cell types prefer the same region is not counted. By
+default the parent of a \code{to} cell type is its own group; \code{parentOverrides} and
+\code{autoOverrideParents} give broader parents. Pairs whose \code{to} has no parent
+other than itself, and pairs of a label with itself, are not tested.
 }
 \examples{
 \donttest{

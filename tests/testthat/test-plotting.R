@@ -148,11 +148,12 @@ test_that("plotMetricBoxplot takes lfunction or kontextual", {
     skip_if_not_installed("ggiraph")
     res = quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome"))
     for (metric in c("lfunction", "kontextual")) {
-        p = plotMetricBoxplot(res, d$spe, "A", "B", "outcome", metric = metric)
+        # relative to G = {A, B}, A -> B has no randomness under the hard-label null; C -> A has
+        p = plotMetricBoxplot(res, d$spe, "C", "A", "outcome", metric = metric)
         expect_s3_class(p, "girafe")
 
         # boxplots and points, with no lines joining the points
-        gg = stBoot:::metricBoxplotGG(res, cells, "A", "B", "outcome", metric)
+        gg = stBoot:::metricBoxplotGG(res, cells, "C", "A", "outcome", metric)
         geoms = vapply(gg$layers, function(l) class(l$geom)[1], "")
         expect_gt(length(geoms), 0)
         expect_true("GeomBoxplot" %in% geoms)

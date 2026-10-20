@@ -12,7 +12,9 @@ runNicheIdentification(
   toLabels = NULL,
   r = c(20, 50, 100),
   k,
-  BPPARAM = BiocParallel::SerialParam(),
+  window = "convex",
+  lisaFunc = "K",
+  cores = 1,
   seed = 51773,
   cellType = "cellType",
   cellID = "cellID",
@@ -24,8 +26,7 @@ runNicheIdentification(
 \arguments{
 \item{spe}{A \code{SummarizedExperiment} (e.g. \code{SpatialExperiment}) with a
 cell ID, cell type, image and coordinates for every cell (see
-\code{\link[=getCellData]{getCellData()}}). Images whose smaller side is below \code{2 * r} are dropped,
-with a message listing them.}
+\code{\link[=getCellData]{getCellData()}}).}
 
 \item{cellTypeTree}{A cell type tree, see \link{cellTypeTree}.}
 
@@ -35,21 +36,23 @@ with a message listing them.}
 defaults to every leaf and group in the tree. An error is raised for a
 label that is not in the tree.}
 
-\item{r}{Radii for the local co-localisation curves: one or more positive numbers.}
+\item{r}{Radii of the local curves: one or more positive numbers.}
 
 \item{k}{Number of niches, a whole number of at least 2 and below the number
 of cells.}
 
-\item{BPPARAM}{A \link[BiocParallel:BiocParallelParam-class]{BiocParallel::BiocParallelParam} object saying how
-to run the per-image computations in parallel, for example
-\code{\link[BiocParallel:MulticoreParam]{BiocParallel::MulticoreParam()}}. The default runs serially.}
+\item{window, lisaFunc}{The image window and the local function (\code{"K"} or
+\code{"L"}), as in \code{lisaClust::lisa()}.}
+
+\item{cores}{Number of threads.}
 
 \item{seed}{Random seed for the k-means clustering, as in
 \code{\link[=bootstrapLineageConfidence]{bootstrapLineageConfidence()}}, or \code{NULL} for no fixed seed. The same seed
 is used for the unweighted and weighted clusterings.}
 
 \item{cellType, cellID, imageID}{Names of the \code{colData(spe)} columns holding
-each cell's cell type label, a unique cell ID, and the image it is in.}
+each cell's cell type label, a unique cell ID (matching the \code{cellID}
+column of \code{confList}), and the image it is in.}
 
 \item{x, y}{Names of the columns holding the cell coordinates. For a
 \code{SpatialExperiment} whose coordinates are in \code{spatialCoords()}, the
@@ -63,18 +66,16 @@ A list with the feature matrices (\code{lisaMatUnweighted},
 \description{
 Defines niches by k-means clustering of per-cell feature vectors, once with
 hard cell type membership and once with bootstrap-confidence weights. The
-features of each cell are its local co-localisation curves at several radii.
+features of each cell are its local indicators of spatial association from
+lisaClust (\code{lisaClust::lisa()}) at several radii.
 }
 \details{
 For every cell, every label in \code{toLabels} and every radius in \code{r}, the
-feature is the local co-localisation of the cell's neighbours with that label,
-centred so that 0 means no attraction or repulsion. Where a label is absent
-from an image the feature is set to 0. The weighted features count each
-neighbour with its bootstrap confidence of having the label, instead of 0 or
-1.
-
-Images whose smaller side is below \code{2 * max(r)} are too small to hold a
-neighbourhood and are dropped, with a message; their cells get no niche.
+feature is the local co-localisation of the cell's neighbours with that label
+(lisaClust's local K or L function, centred so that 0 means no attraction or
+repulsion). The weighted features count each neighbour with its bootstrap
+confidence of having the label, instead of 0 or 1 (see \code{\link[=confidenceWeights]{confidenceWeights()}}),
+and a label's density is its summed weight per unit area.
 
 Niche names (\code{niche1}, \code{niche2}, ...) are arbitrary. K-means starts from
 random cluster centres, so the niches depend on the random seed. The

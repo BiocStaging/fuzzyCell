@@ -47,21 +47,13 @@ test_that("identical features give identical unweighted and weighted niches", {
     expect_identical(res$nicheUnweighted, res$nicheWeighted)
 })
 
-test_that("images too small for the largest radius are dropped with a message", {
-    tiny = d$spe[, d$spe$imageID == "img1"]
-    SpatialExperiment::spatialCoords(tiny) =
-        SpatialExperiment::spatialCoords(tiny) / 3
-    tiny$imageID = "tiny"
-    colnames(tiny) = paste0("t_", colnames(tiny))
-    tiny$cellID = colnames(tiny)
-    spe = BiocGenerics::cbind(d$spe, tiny)
-    # the tiny image is about 100 units wide, so 2 * 60 = 120 drops it
-    msgs = testthat::capture_messages(
-        res <- suppressWarnings(runNicheIdentification(spe, d$tree, d$conf,
-            r = c(20, 60), k = 3)))
-    expect_equal(sum(grepl("Dropping 1 of 7 images smaller than 2 x r = 120", msgs)), 1)
-    expect_false(any(grepl("^t_", names(res$nicheWeighted))))
-    expect_length(res$nicheWeighted, ncol(d$spe))
+test_that("the unweighted features are lisaClust's curves of the cell types and groups", {
+    res = quiet(runNicheIdentification(d$spe, d$tree, d$conf, r = c(20, 50), k = 3))
+    cells = getCellData(d$spe)
+    w = confidenceWeights(d$spe, d$tree, d$conf, weighted = FALSE)
+    direct = quiet(lisaClust::lisa(cells[, c("cellID", "imageID", "cellType", "x", "y")], r = c(20, 50),
+        cellTypeWeights = w))
+    expect_equal(res$lisaMatUnweighted, direct)
 })
 
 ## ---- testNicheOutcome -----------------------------------------------------

@@ -8,7 +8,7 @@ test_that("runColocalisationModels runs end to end", {
     res = quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome"))
     expect_named(res, c("weighted", "unweighted", "modelWeighted",
         "modelUnweighted", "relativeWeighted", "relativeUnweighted",
-        "modelRelativeWeighted", "modelRelativeUnweighted"))
+        "modelRelativeWeighted", "modelRelativeUnweighted", "spicy"))
     expect_setequal(unique(res$weighted$imageID), paste0("img", 1:6))
     expect_true(all(c("from", "to", "estimate", "p.adj") %in%
         names(res$modelWeighted)))
@@ -35,7 +35,7 @@ test_that("proportion pipelines run end to end", {
     expect_true(all(rel$proportions$proportionUnweighted <= 1, na.rm = TRUE))
 })
 
-test_that("results do not depend on the BiocParallel backend", {
+test_that("results do not depend on the BiocParallel backend or the number of threads", {
     skip_on_os("windows")
     multi = BiocParallel::MulticoreParam(2)
     expect_equal(
@@ -44,8 +44,6 @@ test_that("results do not depend on the BiocParallel backend", {
         quiet(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 3, seed = 1,
             BPPARAM = multi)))
     expect_equal(
-        quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome",
-            BPPARAM = serial)),
-        quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome",
-            BPPARAM = multi)))
+        quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome", cores = 1)),
+        quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome", cores = 2)))
 })

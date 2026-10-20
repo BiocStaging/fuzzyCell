@@ -1,7 +1,6 @@
 #' @keywords internal
 "_PACKAGE"
 
-#' @importFrom data.table as.data.table dcast .N :=
 #' @importFrom stats kmeans lm p.adjust predict as.formula reorder setNames
 #' @importFrom stats var
 #' @importFrom utils head

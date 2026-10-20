@@ -59,13 +59,6 @@ generateComparisons = function(cellTypeTree, confList) {
     list(groupGroup = groupGroup, groupLeaf = groupLeaf, leafLeaf = leafLeaf)
 }
 
-# L-value calculation
-Lfunction = function(numerator, r, area, sumWeightsChild1, sumWeightsChild2) {
-    lambda2 = sumWeightsChild2 / area
-    kvalue = (numerator / lambda2) * (1 / sumWeightsChild1)
-    sqrt(kvalue / pi) - r
-}
-
 # log1p-normalizes and z-scores every row (cell) of a cells x genes count matrix
 # in one
 # vectorized pass. Cells with zero total count come out all-zero.
@@ -85,26 +78,6 @@ scaleCountMat = function(mat) {
 # radius-`maxD`
 # disc around each point that lies inside the observation window (1 for interior
 # points).
-# Copied from Statial:::.borderEdge (Statial, GPL-3,
-# https://github.com/SydneyBioX/Statial)
-# so we don't depend on an unexported function.
-borderEdge = function(X, maxD) {
-    W = X$window
-    bW = spatstat.geom::union.owin(
-        spatstat.geom::border(W, maxD, outside = FALSE),
-        spatstat.geom::border(W, 2, outside = TRUE)
-    )
-    inB = spatstat.geom::inside.owin(X$x, X$y, bW)
-    e = rep(1, X$n)
-    if (any(inB)) {
-        circs = spatstat.geom::discs(X[inB], maxD, separate = TRUE)
-        circs = spatstat.geom::solapply(circs, spatstat.geom::intersect.owin, X$window)
-        areas = unlist(lapply(circs, spatstat.geom::area)) / (pi * maxD^2)
-        e[inB] = areas
-    }
-    e
-}
-
 # names of the per-cell columns of a SummarizedExperiment (its colData) or of a
 # data.frame / DataFrame
 cellDataNames = function(x) {
@@ -150,10 +123,10 @@ checkAssay = function(spe, value, arg = "assayName") {
 # checks the per-image outcome used by the co-localisation models: the column
 # exists, has a single value per image, and has exactly two levels. If `subject`
 # is given, also checks that every image comes from a different subject.
-checkOutcome = function(cells, outcomeCol, subject = NULL) {
+checkOutcome = function(cells, outcomeCol, subject = NULL, oneImagePerSubject = TRUE) {
     checkColumn(cells, outcomeCol, "outcomeCol")
     checkColumn(cells, "imageID", "imageID")
-    if (!is.null(subject)) checkSubjects(cells, subject)
+    if (!is.null(subject)) checkSubjects(cells, subject, oneImagePerSubject)
     outcome = cells[[outcomeCol]]
 
     # one value per image: each image is one independent observation, so
@@ -193,48 +166,11 @@ checkOutcome = function(cells, outcomeCol, subject = NULL) {
     invisible(levels)
 }
 
-# images whose smaller side is below 2 * r, i.e. too small to hold a
-# neighbourhood of radius r. Returns a data.frame (imageID, xRange, yRange), one
-# row per such image.
-smallImages = function(cells, r) {
-    xRange = tapply(cells$x, cells$imageID, function(v) diff(range(v)))
-    yRange = tapply(cells$y, cells$imageID, function(v) diff(range(v)))
-    small = which(pmin(xRange, yRange) < 2 * r)
-    data.frame(imageID = names(xRange)[small], xRange = as.numeric(xRange[small]),
-        yRange = as.numeric(yRange[small]), stringsAsFactors = FALSE)
-}
-
-# tells the user which images are being dropped as too small for radius r, and
-# stops if that is every image
-reportSmallImages = function(small, nImages, r) {
-    if (nrow(small) == 0) {
-        return(invisible())
-    }
-    if (nrow(small) == nImages) {
-        stop("All ", nImages, " images are smaller than 2 x r = ", 2 * r,
-            " units in at least one direction. Use a smaller `r`.", call. = FALSE)
-    }
-    shown = utils::head(small, 10)
-    message("Dropping ", nrow(small), " of ", nImages, " images smaller than ",
-        "2 x r = ", 2 * r, " units in at least one direction: ",
-        paste0(shown$imageID, " (", round(shown$xRange), " x ", round(shown$yRange), ")",
-            collapse = ", "), if (nrow(small) > 10) ", ...")
-    invisible()
-}
-
-# removes images that are too small for radius r from the per-cell data, with a
-# message listing them
-dropSmallImages = function(cells, r) {
-    small = smallImages(cells, r)
-    reportSmallImages(small, length(unique(cells$imageID)), r)
-    cells[!cells$imageID %in% small$imageID, , drop = FALSE]
-}
-
 # checks that images and subjects map one-to-one: every image belongs to a
 # single subject, and every subject contributes a single image. Several images
 # from one subject are not independent, and the models treat every image as an
 # independent observation (they are not mixed models).
-checkSubjects = function(cells, subject) {
+checkSubjects = function(cells, subject, oneImagePerSubject = TRUE) {
     checkColumn(cells, subject, "subject")
     checkColumn(cells, "imageID", "imageID")
     ids = as.character(cells[[subject]])
@@ -268,7 +204,9 @@ checkSubjects = function(cells, subject) {
             perImage$text, if (perImage$more) "; ...", ".", call. = FALSE)
     }
 
-    # every subject must contribute one image
+    # every subject must contribute one image (unless images of a subject are
+    # combined, as in the spicyR tests)
+    if (!oneImagePerSubject) return(invisible(TRUE))
     perSubject = describe("subject", "imageID")
     if (perSubject$n > 0) {
         stop("`subject = \"", subject, "\"` has more than one image for ",
