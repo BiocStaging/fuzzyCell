@@ -244,3 +244,18 @@ test_that("crossfitLineageProbabilities gives probabilities for every cell of ea
     own = ifelse(d$spe$cellType[match(p$G$cellID, d$spe$cellID)] == "A", p$G$A, p$G$B)
     expect_gt(mean(own > 0.5), 0.7)
 })
+
+test_that("observed priors move fewer cells into a rare class", {
+    set.seed(5)
+    n = c(A = 400, B = 40)
+    lab = rep(names(n), n)
+    mu = rbind(A = c(3, 3, 1, 1), B = c(2, 2, 2, 2))
+    counts = t(vapply(lab, function(l) rpois(4, mu[l, ] * 3), numeric(4)))
+    colnames(counts) = paste0("g", 1:4)
+    bal = suppressMessages(bootstrapClassify(counts, lab, nBoot = 10, seed = 1))
+    obs = suppressMessages(bootstrapClassify(counts, lab, nBoot = 10, seed = 1, priors = "observed"))
+    expect_lt(mean(obs[lab == "A", "B"]), mean(bal[lab == "A", "B"]))
+    p1 = crossfitClassify(counts, lab, nFolds = 3, seed = 1)
+    p2 = crossfitClassify(counts, lab, nFolds = 3, seed = 1, priors = "observed")
+    expect_lt(sum(p2[, "B"]), sum(p1[, "B"]))
+})

@@ -15,6 +15,7 @@ bootstrapLineageConfidence(
   skipGroups = character(0),
   classifier = c("logistic", "rf", "lda", "svm"),
   ntree = 500,
+  priors = c("balanced", "observed"),
   cellType = "cellType",
   cellID = "cellID",
   assayName = "counts"
@@ -55,6 +56,11 @@ discriminant analysis, via MASS) or \code{"svm"} (support vector machine, via
 e1071).}
 
 \item{ntree}{Number of trees; only used when \code{classifier = "rf"}.}
+
+\item{priors}{The classifier is trained with balanced classes, which gives
+every class the same prior. \code{"balanced"} keeps those equal priors;
+\code{"observed"} weights each class by its share of the cells, so a resample
+is assigned to its most probable class given how common the classes are.}
 
 \item{cellType}{Name of the \code{colData(spe)} column holding each cell's cell
 type label.}

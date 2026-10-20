@@ -32,6 +32,7 @@ Imports:
     glmnet,
     lisaClust,
     MASS,
+    Matrix,
     methods,
     pheatmap,
     randomForest,

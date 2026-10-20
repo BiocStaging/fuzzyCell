@@ -53,11 +53,20 @@ resampleCounts = function(layout) {
 # Predict class labels, uniformly as a character vector regardless of classifier
 # type. MASS::lda returns a list ($class among other things), e1071::svm and
 # randomForest::randomForest return the predicted factor directly.
-predictClassifierClass = function(fit, newx, classifier = c("logistic", "rf", "lda", "svm")) {
+# logPrior: optional named log class priors added to the classifier's log posterior (its training classes are
+# balanced, so its own prior is uniform).
+predictClassifierClass = function(fit, newx, classifier = c("logistic", "rf", "lda", "svm"), logPrior = NULL) {
     classifier = match.arg(classifier)
     if (classifier == "logistic") {
-        eta = newx[, fit$genes, drop = FALSE] %*% fit$beta
-        return(colnames(fit$beta)[max.col(sweep(eta, 2, fit$a0, "+"), ties.method = "first")])
+        eta = sweep(newx[, fit$genes, drop = FALSE] %*% fit$beta, 2, fit$a0, "+")
+        if (!is.null(logPrior)) eta = sweep(eta, 2, logPrior[colnames(fit$beta)], "+")
+        return(colnames(fit$beta)[max.col(eta, ties.method = "first")])
+    }
+    if (!is.null(logPrior)) {
+        if (classifier == "svm") stop("class priors are not available for classifier = \"svm\"", call. = FALSE)
+        p = if (classifier == "lda") predict(fit, newx)$posterior else predict(fit, newx, type = "prob")
+        p = sweep(p, 2, exp(logPrior[colnames(p)]), "*")
+        return(colnames(p)[max.col(p, ties.method = "first")])
     }
     switch(classifier,
         lda = as.character(predict(fit, newx)$class),
@@ -95,6 +104,10 @@ predictClassifierClass = function(fit, newx, classifier = c("logistic", "rf", "l
 #'   discriminant analysis, via MASS) or `"svm"` (support vector machine, via
 #'   e1071).
 #' @param ntree Number of trees; only used when `classifier = "rf"`.
+#' @param priors The classifier is trained with balanced classes, which gives
+#'   every class the same prior. `"balanced"` keeps those equal priors;
+#'   `"observed"` weights each class by its share of the cells, so a resample
+#'   is assigned to its most probable class given how common the classes are.
 #'
 #' @return A numeric matrix with one row per cell (in the order of
 #'   `countMat`) and one column per class in `labels`. Entry `[i, k]` is the
@@ -113,8 +126,10 @@ predictClassifierClass = function(fit, newx, classifier = c("logistic", "rf", "l
 #' }
 #' @export
 bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPARAM = BiocParallel::SerialParam(),
-                            seed = NULL, classifier = c("logistic", "rf", "lda", "svm"), ntree = 500) {
+                            seed = NULL, classifier = c("logistic", "rf", "lda", "svm"), ntree = 500,
+                            priors = c("balanced", "observed")) {
     classifier = match.arg(classifier)
+    priors = match.arg(priors)
     labels = as.character(labels)
 
     if (nrow(countMat) != length(labels)) {
@@ -179,10 +194,12 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
     # number of workers.
     if (!is.null(seed)) BiocParallel::bpRNGseed(BPPARAM) = seed
 
+    # observed priors: the classes' shares among these cells
+    logPrior = if (priors == "observed") log(c(table(labels)) / length(labels))
     layout = resampleLayout(countMat)
     preds = BiocParallel::bplapply(seq_len(nBoot), function(b) {
         bootMat = resampleCounts(layout)
-        predictClassifierClass(fit, scaleCountMat(bootMat)[, keep, drop = FALSE], classifier)
+        predictClassifierClass(fit, scaleCountMat(bootMat)[, keep, drop = FALSE], classifier, logPrior)
     }, BPPARAM = BPPARAM)
 
     predMatrix = do.call(cbind, preds)
@@ -203,19 +220,19 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
 # results) - that accumulated heap is what gets duplicated into every worker otherwise,
 # ballooning RSS on large lineages.
 bootstrapLineageInSubprocess = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, wd,
-                                         classifier = "rf", ntree = 500) {
+                                         classifier = "rf", ntree = 500, priors = "balanced") {
     callr::r(
-        func = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, classifier, ntree) {
+        func = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, classifier, ntree, priors) {
             set.seed(seed)
             stBoot::bootstrapClassify(countMat, labels,
                 nBoot = nBoot, nPerClass = nPerClass, BPPARAM = BPPARAM,
-                seed = seed, classifier = classifier, ntree = ntree
+                seed = seed, classifier = classifier, ntree = ntree, priors = priors
             )
         },
         args = list(
             countMat = countMat, labels = labels, nBoot = nBoot,
             nPerClass = nPerClass, BPPARAM = BPPARAM, seed = seed,
-            classifier = classifier, ntree = ntree
+            classifier = classifier, ntree = ntree, priors = priors
         ),
         wd = wd,
         stdout = "", stderr = "" # inherit this session's streams so progress bars still show live
@@ -275,7 +292,7 @@ checkpointSettingsDiff = function(stored, current) {
     fmt = function(x) if (is.null(x)) "NULL" else paste(x, collapse = ", ")
     same = function(a, b) isTRUE(all.equal(a, b))
     diffs = character(0)
-    for (nm in c("nBoot", "nPerClass", "classifier", "ntree", "seed")) {
+    for (nm in c("nBoot", "nPerClass", "classifier", "ntree", "seed", "priors")) {
         if (nm == "ntree" && !"rf" %in% c(stored$classifier, current$classifier)) next
         if (!same(stored[[nm]], current[[nm]])) {
             diffs = c(diffs, sprintf("%s (checkpoint: %s, this call: %s)",
@@ -345,9 +362,11 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
                                        BPPARAM = BiocParallel::SerialParam(), seed = 51773, checkpointDir = NULL,
                                        skipGroups = character(0),
                                        classifier = c("logistic", "rf", "lda", "svm"), ntree = 500,
+                                       priors = c("balanced", "observed"),
                                        cellType = "cellType", cellID = "cellID",
                                        assayName = "counts") {
     classifier = match.arg(classifier)
+    priors = match.arg(priors)
 
     checkSpe(spe)
     checkColumn(spe, cellType, "cellType")
@@ -392,7 +411,7 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
         # how this group is bootstrapped, recorded with the result so a
         # checkpoint can later be compared with the settings of a re-run
         settings = list(
-            nBoot = nBoot, nPerClass = nPerClass, classifier = classifier,
+            nBoot = nBoot, nPerClass = nPerClass, classifier = classifier, priors = priors,
             ntree = ntree, seed = groupSeed, children = unique(labels),
             stBootVersion = tryCatch(as.character(utils::packageVersion("stBoot")),
                 error = function(e) NA_character_)
@@ -427,18 +446,16 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
         ))
         startTime = Sys.time()
 
-        countMat = assay(spe[, idx], assayName) |>
-            t() |>
-            as.matrix()
+        countMat = denseCounts(assay(spe[, idx], assayName))
 
         freqMatrix = if (!is.null(checkpointDir)) {
             bootstrapLineageInSubprocess(countMat, labels, nBoot, nPerClass, BPPARAM, groupSeed,
-                wd = getwd(), classifier = classifier, ntree = ntree
+                wd = getwd(), classifier = classifier, ntree = ntree, priors = priors
             )
         } else {
             bootstrapClassify(countMat, labels,
                 nBoot = nBoot, nPerClass = nPerClass,
-                BPPARAM = BPPARAM, seed = groupSeed, classifier = classifier, ntree = ntree
+                BPPARAM = BPPARAM, seed = groupSeed, classifier = classifier, ntree = ntree, priors = priors
             )
         }
 
@@ -462,4 +479,11 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
             "only one cell type present", call. = FALSE)
     }
     confList
+}
+
+# A cells x genes dense count matrix from a genes x cells assay, dense or sparse
+# (a sparse assay is made dense one group at a time).
+denseCounts = function(m) {
+    if (methods::is(m, "sparseMatrix")) m = as.matrix(m)
+    t(as.matrix(m))
 }

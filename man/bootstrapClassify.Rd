@@ -12,7 +12,8 @@ bootstrapClassify(
   BPPARAM = BiocParallel::SerialParam(),
   seed = NULL,
   classifier = c("logistic", "rf", "lda", "svm"),
-  ntree = 500
+  ntree = 500,
+  priors = c("balanced", "observed")
 )
 }
 \arguments{
@@ -43,6 +44,11 @@ discriminant analysis, via MASS) or \code{"svm"} (support vector machine, via
 e1071).}
 
 \item{ntree}{Number of trees; only used when \code{classifier = "rf"}.}
+
+\item{priors}{The classifier is trained with balanced classes, which gives
+every class the same prior. \code{"balanced"} keeps those equal priors;
+\code{"observed"} weights each class by its share of the cells, so a resample
+is assigned to its most probable class given how common the classes are.}
 }
 \value{
 A numeric matrix with one row per cell (in the order of

@@ -18,8 +18,10 @@ predictClassifierProb = function(fit, newx, classifier = c("logistic", "rf", "ld
 # other folds with balanced classes (as in bootstrapClassify()), so no cell is
 # scored by a classifier that saw it.
 crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed = NULL,
-                            classifier = c("logistic", "rf", "lda"), ntree = 500) {
+                            classifier = c("logistic", "rf", "lda"), ntree = 500,
+                            priors = c("balanced", "observed")) {
     classifier = match.arg(classifier)
+    priors = match.arg(priors)
     labels = as.character(labels)
     if (!is.null(seed)) set.seed(seed)
     scaledMat = scaleCountMat(countMat)
@@ -43,6 +45,10 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
         out[test, colnames(p)] = p
     }
     out[is.na(out)] = 0
+    if (priors == "observed") {
+        out = sweep(out, 2, c(table(factor(labels, levels = classes))) / length(labels), "*")
+        out = out / rowSums(out)
+    }
     out
 }
 
@@ -60,6 +66,8 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #' @param nFolds Number of folds.
 #' @param classifier `"logistic"` (the default), `"rf"` or `"lda"`, as in
 #'   [bootstrapClassify()].
+#' @param priors `"balanced"` (equal priors, as the classifier is trained) or
+#'   `"observed"` (each class weighted by its share of the group's cells).
 #'
 #' @return A confidence list in the format of [bootstrapLineageConfidence()],
 #'   with probabilities in place of bootstrap confidences.
@@ -74,9 +82,11 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #' @export
 crossfitLineageProbabilities = function(spe, cellTypeTree, nFolds = 5, nPerClass = 50, seed = 51773,
                                         classifier = c("logistic", "rf", "lda"), ntree = 500,
+                                        priors = c("balanced", "observed"),
                                         skipGroups = character(0), cellType = "cellType",
                                         cellID = "cellID", assayName = "counts") {
     classifier = match.arg(classifier)
+    priors = match.arg(priors)
     checkSpe(spe)
     checkColumn(spe, cellType, "cellType")
     checkColumn(spe, cellID, "cellID")
@@ -87,9 +97,10 @@ crossfitLineageProbabilities = function(spe, cellTypeTree, nFolds = 5, nPerClass
         idx = which(spe$group == groups[gi])
         labels = spe[[cellType]][idx]
         if (length(idx) == 0 || length(unique(labels)) < 2) return(NULL)
-        countMat = as.matrix(t(assay(spe[, idx], assayName)))
+        countMat = denseCounts(assay(spe[, idx], assayName))
         p = crossfitClassify(countMat, labels, nFolds = nFolds, nPerClass = nPerClass,
-            seed = if (is.null(seed)) NULL else seed + gi, classifier = classifier, ntree = ntree)
+            seed = if (is.null(seed)) NULL else seed + gi, classifier = classifier, ntree = ntree,
+            priors = priors)
         message(sprintf("[%d/%d] Lineage: %s done", gi, length(groups), groups[gi]))
         data.frame(cellID = spe[[cellID]][idx], p, check.names = FALSE)
     })

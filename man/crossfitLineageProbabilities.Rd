@@ -12,6 +12,7 @@ crossfitLineageProbabilities(
   seed = 51773,
   classifier = c("logistic", "rf", "lda"),
   ntree = 500,
+  priors = c("balanced", "observed"),
   skipGroups = character(0),
   cellType = "cellType",
   cellID = "cellID",
@@ -37,6 +38,9 @@ group is reproducible independently of the others.}
 \code{\link[=bootstrapClassify]{bootstrapClassify()}}.}
 
 \item{ntree}{Number of trees; only used when \code{classifier = "rf"}.}
+
+\item{priors}{\code{"balanced"} (equal priors, as the classifier is trained) or
+\code{"observed"} (each class weighted by its share of the group's cells).}
 
 \item{skipGroups}{Names of groups to leave out of the result.}
 
