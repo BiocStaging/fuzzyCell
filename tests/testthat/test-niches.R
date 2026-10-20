@@ -52,7 +52,7 @@ test_that("the unweighted features are lisaClust's curves of the cell types and 
     cells = getCellData(d$spe)
     w = confidenceWeights(d$spe, d$tree, d$conf, weighted = FALSE)
     direct = quiet(lisaClust::lisa(cells[, c("cellID", "imageID", "cellType", "x", "y")], r = c(20, 50),
-        cellTypeWeights = w))
+        cellWeights = w))
     expect_equal(res$lisaMatUnweighted, direct)
 })
 

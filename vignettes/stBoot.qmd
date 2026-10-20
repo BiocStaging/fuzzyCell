@@ -199,7 +199,7 @@ plotProportionBoxplot(relProps, "CD4+ T cells", spe, "resolution_broad")
 
 `runColocalisationModels()` tests, for every pair of cell types and groups, whether their co-localisation differs between the outcomes, with spicyR's test (`spicyR::spicy()`). For a pair `from` → `to`, the co-localisation in an image is the extra fraction of `to` cells with a `from` cell within 50 µm, beyond what is expected if the `to` cells were placed at random among the cells that are not `from` cells; images are combined within patients and the outcomes compared with patients as the units. With the weights, each `to` cell counts with its confidence, and its chance of having a `from` neighbour is computed as if the labels of its neighbours were drawn from their confidences. The relative co-localisation, which compares a pair with the parent population of the `to` cell type, is Statial's Kontextual test with the same weights. The weighted and unweighted results are returned side by side. For the vignette we use a subset of six patients per outcome; confidences from the full dataset are reused.
 
-`confidenceWeights()` returns the weights themselves (one column per cell type and group), which can be passed to spicyR and lisaClust directly as `cellTypeWeights`.
+`confidenceWeights()` returns the weights themselves (one column per cell type and group), which can be passed to spicyR and lisaClust directly as `cellWeights`.
 
 ```{r subset}
 # the first six images of each outcome, plus the biopsy plotted above

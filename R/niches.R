@@ -86,7 +86,7 @@ runNicheIdentification = function(spe, cellTypeTree, confList, toLabels = NULL, 
         w = weightMatrix(cells, cellTypeTree, confList, v == "weighted")
         lisaMat[[v]] = lisaClust::lisa(cells[, c("cellID", "imageID", "cellType", "x", "y")], r = r,
             window = window, lisaFunc = lisaFunc, cores = cores,
-            cellTypeWeights = w[, intersect(colnames(w), toLabels), drop = FALSE])
+            cellWeights = w[, intersect(colnames(w), toLabels), drop = FALSE])
     }
 
     # the same seed for both clusterings, so that they differ only through the

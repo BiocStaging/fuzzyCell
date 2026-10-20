@@ -1,7 +1,7 @@
 # stBoot 0.99.1
 
 * Co-localisation (`runColocalisationModels()`) is spicyR's cell-level test with the confidences as soft cell type
-  weights (`spicyR::spicy(cellTypeWeights =)`), and relative co-localisation is Statial's Kontextual test with the
+  weights (`spicyR::spicy(cellWeights =)`), and relative co-localisation is Statial's Kontextual test with the
   same weights (`spicyR::kontextualEngine()`); images of a subject are combined, so several images per subject are
   allowed. New `effect` argument (`"allocation"` or `"count"`).
 * Niches (`runNicheIdentification()`) cluster lisaClust's local curves with the weights (`lisaClust::lisa()`).

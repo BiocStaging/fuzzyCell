@@ -180,11 +180,11 @@ runColocalisationModels = function(spe, cellTypeTree, confList, outcomeCol, r = 
     for (v in names(weights)) {
         message("Testing ", v, " co-localisation...")
         res[[v]] = spicyR::spicy(cells, condition = outcomeCol, subject = sub, r = r, from = labels, to = labels,
-            effect = effect, cores = cores, cellTypeWeights = weights[[v]])
+            effect = effect, cores = cores, cellWeights = weights[[v]])
         rel = paste0("relative", toupper(substring(v, 1, 1)), substring(v, 2))
         message("Testing ", v, " relative co-localisation...")
         res[[rel]] = if (nrow(triples)) spicyR::kontextualEngine(cells, triples, condition = outcomeCol,
-            subject = sub, r = r, cellTypeWeights = weights[[v]])
+            subject = sub, r = r, cellWeights = weights[[v]])
     }
 
     model = function(x, p = NULL) if (is.null(x)) data.frame() else modelTable(x, p)
