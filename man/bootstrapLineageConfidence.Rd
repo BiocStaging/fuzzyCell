@@ -13,7 +13,7 @@ bootstrapLineageConfidence(
   seed = 51773,
   checkpointDir = NULL,
   skipGroups = character(0),
-  classifier = c("rf", "lda", "svm"),
+  classifier = c("logistic", "rf", "lda", "svm"),
   ntree = 500,
   cellType = "cellType",
   cellID = "cellID",
@@ -48,9 +48,11 @@ be installed.}
 
 \item{skipGroups}{Names of groups to leave out of the result.}
 
-\item{classifier}{One of \code{"rf"} (random forest, via randomForest; the
-default), \code{"lda"} (linear discriminant analysis, via MASS) or \code{"svm"}
-(support vector machine, via e1071).}
+\item{classifier}{One of \code{"logistic"} (ridge multinomial logistic
+regression, via glmnet, with the penalty chosen by cross-validation; the
+default), \code{"rf"} (random forest, via randomForest), \code{"lda"} (linear
+discriminant analysis, via MASS) or \code{"svm"} (support vector machine, via
+e1071).}
 
 \item{ntree}{Number of trees; only used when \code{classifier = "rf"}.}
 

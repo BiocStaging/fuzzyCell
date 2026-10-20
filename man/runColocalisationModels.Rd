@@ -105,7 +105,9 @@ that of \code{from} with a parent population of \code{to}, so that attraction th
 arises because both cell types prefer the same region is not counted. By
 default the parent of a \code{to} cell type is its own group; \code{parentOverrides} and
 \code{autoOverrideParents} give broader parents. Pairs whose \code{to} has no parent
-other than itself, and pairs of a label with itself, are not tested.
+other than itself are not tested.
+
+A label is not paired with itself, nor with a group that contains it.
 }
 \examples{
 \donttest{

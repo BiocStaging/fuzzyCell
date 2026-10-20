@@ -89,7 +89,7 @@ test_that("bootstrapLineageConfidence records its settings", {
             seed = 10)))
     settings = attr(conf$Grp, "settings")
     expect_equal(settings[c("nBoot", "nPerClass", "classifier", "ntree",
-        "seed")], list(nBoot = 3, nPerClass = 20, classifier = "rf",
+        "seed")], list(nBoot = 3, nPerClass = 20, classifier = "logistic",
         ntree = 500, seed = 11))
     expect_setequal(settings$children, c("A", "B"))
     expect_true("stBootVersion" %in% names(settings))
@@ -231,4 +231,16 @@ test_that("checkpointing round-trips (full data)", {
         bootstrapLineageConfidence(d$spe, d$heartCellTypeTree, nBoot = 5,
             seed = 1, checkpointDir = dir)))
     expect_equal(loadCheckpointedConfList(d$heartCellTypeTree, dir), conf)
+})
+
+test_that("crossfitLineageProbabilities gives probabilities for every cell of each group", {
+    d = miniPipelineData()
+    p = suppressMessages(crossfitLineageProbabilities(d$spe, d$tree, nFolds = 3, seed = 1))
+    expect_named(p, "G")
+    expect_setequal(names(p$G), c("cellID", "A", "B"))
+    expect_equal(nrow(p$G), sum(d$spe$cellType %in% c("A", "B")))
+    expect_equal(unname(rowSums(p$G[, c("A", "B")])), rep(1, nrow(p$G)))
+    # A and B differ in genes 1-3 vs 4-6: most cells get their own label
+    own = ifelse(d$spe$cellType[match(p$G$cellID, d$spe$cellID)] == "A", p$G$A, p$G$B)
+    expect_gt(mean(own > 0.5), 0.7)
 })

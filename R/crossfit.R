@@ -1,0 +1,98 @@
+# Class probabilities from a trained classifier, one column per class.
+predictClassifierProb = function(fit, newx, classifier = c("logistic", "rf", "lda")) {
+    classifier = match.arg(classifier)
+    if (classifier == "logistic") {
+        eta = sweep(newx[, fit$genes, drop = FALSE] %*% fit$beta, 2, fit$a0, "+")
+        eta = eta - apply(eta, 1, max)
+        p = exp(eta)
+        return(p / rowSums(p))
+    }
+    switch(classifier,
+        rf = predict(fit, newx, type = "prob"),
+        lda = predict(fit, newx)$posterior
+    )
+}
+
+# Cross-fitted class probabilities for the cells of one group: the cells are
+# split into folds, and each fold is predicted by a classifier trained on the
+# other folds with balanced classes (as in bootstrapClassify()), so no cell is
+# scored by a classifier that saw it.
+crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed = NULL,
+                            classifier = c("logistic", "rf", "lda"), ntree = 500) {
+    classifier = match.arg(classifier)
+    labels = as.character(labels)
+    if (!is.null(seed)) set.seed(seed)
+    scaledMat = scaleCountMat(countMat)
+    keep = apply(scaledMat, 2, var) > 0
+    keep = keep & !is.na(keep)
+    scaledMat = scaledMat[, keep, drop = FALSE]
+    classes = sort(unique(labels))
+    fold = sample(rep(seq_len(nFolds), length.out = length(labels)))
+    out = matrix(NA_real_, length(labels), length(classes), dimnames = list(NULL, classes))
+    for (k in seq_len(nFolds)) {
+        train = which(fold != k)
+        sizes = table(labels[train])
+        targetSize = max(min(sizes), nPerClass)
+        balancedIdx = unlist(lapply(names(sizes), function(lab) {
+            idx = train[labels[train] == lab]
+            idx[sample.int(length(idx), size = targetSize, replace = length(idx) < targetSize)]
+        }))
+        fit = trainClassifier(scaledMat[balancedIdx, , drop = FALSE], labels[balancedIdx], classifier, ntree = ntree)
+        test = which(fold == k)
+        p = predictClassifierProb(fit, scaledMat[test, , drop = FALSE], classifier)
+        out[test, colnames(p)] = p
+    }
+    out[is.na(out)] = 0
+    out
+}
+
+#' Cross-fitted classification probabilities for every group of a tree
+#'
+#' An alternative to [bootstrapLineageConfidence()]: for each group with
+#' children, a classifier is trained on the group's cells with balanced classes
+#' and gives each cell the probability of each child cell type. The cells are
+#' split into `nFolds` folds and each fold is scored by a classifier trained on
+#' the other folds, so no cell is scored by a classifier that saw it. Because
+#' the classes are balanced in training, the probabilities give every child cell
+#' type the same prior weight.
+#'
+#' @inheritParams bootstrapLineageConfidence
+#' @param nFolds Number of folds.
+#' @param classifier `"logistic"` (the default), `"rf"` or `"lda"`, as in
+#'   [bootstrapClassify()].
+#'
+#' @return A confidence list in the format of [bootstrapLineageConfidence()],
+#'   with probabilities in place of bootstrap confidences.
+#'
+#' @examples
+#' \donttest{
+#' spe = loadAmancherla("pre")
+#' data(heartCellTypeTree)
+#' probList = crossfitLineageProbabilities(spe, heartCellTypeTree, seed = 1)
+#' head(probList[["Vascular"]])
+#' }
+#' @export
+crossfitLineageProbabilities = function(spe, cellTypeTree, nFolds = 5, nPerClass = 50, seed = 51773,
+                                        classifier = c("logistic", "rf", "lda"), ntree = 500,
+                                        skipGroups = character(0), cellType = "cellType",
+                                        cellID = "cellID", assayName = "counts") {
+    classifier = match.arg(classifier)
+    checkSpe(spe)
+    checkColumn(spe, cellType, "cellType")
+    checkColumn(spe, cellID, "cellID")
+    checkAssay(spe, assayName)
+    spe = annotateCellTypeTree(spe, cellTypeTree, cellType = cellType)
+    groups = setdiff(buildCellTypeMap(cellTypeTree)$groupsWithChildren, skipGroups)
+    probList = lapply(seq_along(groups), function(gi) {
+        idx = which(spe$group == groups[gi])
+        labels = spe[[cellType]][idx]
+        if (length(idx) == 0 || length(unique(labels)) < 2) return(NULL)
+        countMat = as.matrix(t(assay(spe[, idx], assayName)))
+        p = crossfitClassify(countMat, labels, nFolds = nFolds, nPerClass = nPerClass,
+            seed = if (is.null(seed)) NULL else seed + gi, classifier = classifier, ntree = ntree)
+        message(sprintf("[%d/%d] Lineage: %s done", gi, length(groups), groups[gi]))
+        data.frame(cellID = spe[[cellID]][idx], p, check.names = FALSE)
+    })
+    names(probList) = groups
+    probList[!vapply(probList, is.null, logical(1))]
+}

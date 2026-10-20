@@ -3,10 +3,19 @@
 # A random forest is grown as 25 sub-forests on the workers of BPPARAM and merged
 # with randomForest::combine(); the number of sub-forests does not depend on the
 # number of workers, so the forest does not either.
-trainClassifier = function(x, y, classifier = c("rf", "lda", "svm"), ntree = 500,
+trainClassifier = function(x, y, classifier = c("logistic", "rf", "lda", "svm"), ntree = 500,
                            BPPARAM = BiocParallel::SerialParam()) {
     classifier = match.arg(classifier)
     y = factor(y)
+    if (classifier == "logistic") {
+        # ridge multinomial logistic regression, the penalty chosen by 3-fold
+        # cross-validated deviance; kept as its coefficients
+        cv = glmnet::cv.glmnet(x, y, family = "multinomial", alpha = 0, nfolds = 3, type.measure = "deviance")
+        co = stats::coef(cv, s = "lambda.min")
+        beta = do.call(cbind, lapply(co, function(b) as.numeric(b[-1])))
+        colnames(beta) = names(co)
+        return(list(a0 = vapply(co, function(b) b[1], 0), beta = beta, genes = colnames(x)))
+    }
     if (classifier == "rf") {
         sizes = diff(round(seq(0, ntree, length.out = min(25, ntree) + 1)))
         forests = BiocParallel::bplapply(sizes, function(nt) randomForest::randomForest(x, y, ntree = nt),
@@ -44,8 +53,12 @@ resampleCounts = function(layout) {
 # Predict class labels, uniformly as a character vector regardless of classifier
 # type. MASS::lda returns a list ($class among other things), e1071::svm and
 # randomForest::randomForest return the predicted factor directly.
-predictClassifierClass = function(fit, newx, classifier = c("rf", "lda", "svm")) {
+predictClassifierClass = function(fit, newx, classifier = c("logistic", "rf", "lda", "svm")) {
     classifier = match.arg(classifier)
+    if (classifier == "logistic") {
+        eta = newx[, fit$genes, drop = FALSE] %*% fit$beta
+        return(colnames(fit$beta)[max.col(sweep(eta, 2, fit$a0, "+"), ties.method = "first")])
+    }
     switch(classifier,
         lda = as.character(predict(fit, newx)$class),
         svm = as.character(predict(fit, newx)),
@@ -76,9 +89,11 @@ predictClassifierClass = function(fit, newx, classifier = c("rf", "lda", "svm"))
 #'   given it is set on `BPPARAM`, and the results are identical whichever
 #'   backend and number of workers is used.
 #' @param seed Random seed for reproducibility, or `NULL`. Recommended for reproducibility.
-#' @param classifier One of `"rf"` (random forest, via randomForest; the
-#'   default), `"lda"` (linear discriminant analysis, via MASS) or `"svm"`
-#'   (support vector machine, via e1071).
+#' @param classifier One of `"logistic"` (ridge multinomial logistic
+#'   regression, via glmnet, with the penalty chosen by cross-validation; the
+#'   default), `"rf"` (random forest, via randomForest), `"lda"` (linear
+#'   discriminant analysis, via MASS) or `"svm"` (support vector machine, via
+#'   e1071).
 #' @param ntree Number of trees; only used when `classifier = "rf"`.
 #'
 #' @return A numeric matrix with one row per cell (in the order of
@@ -98,7 +113,7 @@ predictClassifierClass = function(fit, newx, classifier = c("rf", "lda", "svm"))
 #' }
 #' @export
 bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPARAM = BiocParallel::SerialParam(),
-                            seed = NULL, classifier = c("rf", "lda", "svm"), ntree = 500) {
+                            seed = NULL, classifier = c("logistic", "rf", "lda", "svm"), ntree = 500) {
     classifier = match.arg(classifier)
     labels = as.character(labels)
 
@@ -329,7 +344,7 @@ checkpointSettingsDiff = function(stored, current) {
 bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass = 50,
                                        BPPARAM = BiocParallel::SerialParam(), seed = 51773, checkpointDir = NULL,
                                        skipGroups = character(0),
-                                       classifier = c("rf", "lda", "svm"), ntree = 500,
+                                       classifier = c("logistic", "rf", "lda", "svm"), ntree = 500,
                                        cellType = "cellType", cellID = "cellID",
                                        assayName = "counts") {
     classifier = match.arg(classifier)

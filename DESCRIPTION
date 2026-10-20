@@ -29,6 +29,7 @@ Imports:
     e1071,
     forcats,
     ggplot2,
+    glmnet,
     lisaClust,
     MASS,
     methods,
