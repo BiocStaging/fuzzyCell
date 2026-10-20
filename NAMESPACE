@@ -34,7 +34,10 @@ importFrom(SummarizedExperiment,
   colData
 )
 importFrom(methods,is)
-importFrom(rlang,.data)
+importFrom(rlang,
+  ":=",
+  .data
+)
 importFrom(stats,
   as.formula,
   kmeans,

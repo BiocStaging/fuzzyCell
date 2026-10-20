@@ -10,6 +10,9 @@
 #' @inheritParams runColocalisationModels
 #' @param weighted `TRUE` for the bootstrap confidences, `FALSE` for the
 #'   original labels (0/1 weights) on the same columns.
+#' @param cellType,cellID Names of the `colData(spe)` columns holding each
+#'   cell's cell type label and a unique cell ID (matching the `cellID` column
+#'   of `confList`).
 #'
 #' @return A numeric matrix with one row per cell of `spe` (in its order) and one
 #'   named column per leaf cell type and group.

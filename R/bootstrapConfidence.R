@@ -503,6 +503,6 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
 # A cells x genes dense count matrix from a genes x cells assay, dense or sparse
 # (a sparse assay is made dense one group at a time).
 denseCounts = function(m) {
-    if (methods::is(m, "sparseMatrix")) m = as.matrix(m)
+    if (methods::is(m, "sparseMatrix")) m = Matrix::as.matrix(m)
     t(as.matrix(m))
 }

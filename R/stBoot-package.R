@@ -5,7 +5,7 @@
 #' @importFrom stats var
 #' @importFrom utils head
 #' @importFrom methods is
-#' @importFrom rlang .data
+#' @importFrom rlang .data :=
 #' @importFrom SummarizedExperiment colData assay
 #' @import ggplot2
 NULL

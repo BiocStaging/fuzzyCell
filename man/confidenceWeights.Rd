@@ -24,6 +24,10 @@ cell ID, cell type, image and coordinates for every cell (see
 
 \item{weighted}{\code{TRUE} for the bootstrap confidences, \code{FALSE} for the
 original labels (0/1 weights) on the same columns.}
+
+\item{cellType, cellID}{Names of the \code{colData(spe)} columns holding each
+cell's cell type label and a unique cell ID (matching the \code{cellID} column
+of \code{confList}).}
 }
 \value{
 A numeric matrix with one row per cell of \code{spe} (in its order) and one
