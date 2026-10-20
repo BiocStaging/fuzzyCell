@@ -74,10 +74,6 @@ scaleCountMat = function(mat) {
     centred / sds
 }
 
-# Edge-correction weights for every point in a ppp: the fraction of the
-# radius-`maxD`
-# disc around each point that lies inside the observation window (1 for interior
-# points).
 # names of the per-cell columns of a SummarizedExperiment (its colData) or of a
 # data.frame / DataFrame
 cellDataNames = function(x) {

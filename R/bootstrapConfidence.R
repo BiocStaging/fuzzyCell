@@ -1,13 +1,44 @@
 # Train the chosen classifier on a (already scaled/subset) feature matrix. 
 # ntree only applies to classifier = "rf".
-trainClassifier = function(x, y, classifier = c("rf", "lda", "svm"), ntree = 500) {
+# A random forest is grown as 25 sub-forests on the workers of BPPARAM and merged
+# with randomForest::combine(); the number of sub-forests does not depend on the
+# number of workers, so the forest does not either.
+trainClassifier = function(x, y, classifier = c("rf", "lda", "svm"), ntree = 500,
+                           BPPARAM = BiocParallel::SerialParam()) {
     classifier = match.arg(classifier)
     y = factor(y)
+    if (classifier == "rf") {
+        sizes = diff(round(seq(0, ntree, length.out = min(25, ntree) + 1)))
+        forests = BiocParallel::bplapply(sizes, function(nt) randomForest::randomForest(x, y, ntree = nt),
+            BPPARAM = BPPARAM)
+        return(do.call(randomForest::combine, forests))
+    }
     switch(classifier,
         lda = MASS::lda(x, y),
-        svm = e1071::svm(x, y, kernel = "radial"),
-        rf  = randomForest::randomForest(x, y, ntree = ntree)
+        svm = e1071::svm(x, y, kernel = "radial")
     )
+}
+
+# Multinomial resampling of every cell's counts at its own total, in one pass:
+# each of a cell's transcripts is drawn with replacement from its observed
+# transcripts. `layout` is from resampleLayout().
+resampleLayout = function(countMat) {
+    nz = which(countMat > 0, arr.ind = TRUE)
+    nz = nz[order(nz[, 1], nz[, 2]), , drop = FALSE]
+    n = countMat[nz]
+    totals = as.numeric(rowSums(countMat))
+    list(nz = nz, ends = cumsum(n), start = c(0, cumsum(totals))[seq_len(nrow(countMat))],
+        totals = totals, dim = dim(countMat), dimnames = dimnames(countMat))
+}
+resampleCounts = function(layout) {
+    cell = rep.int(seq_along(layout$totals), layout$totals)
+    # a uniform position among the cell's transcripts, then the gene it falls in
+    pos = layout$start[cell] + ceiling(stats::runif(length(cell)) * layout$totals[cell])
+    entry = findInterval(pos - 1, layout$ends) + 1
+    out = matrix(0L, layout$dim[1], layout$dim[2], dimnames = layout$dimnames)
+    hits = tabulate(entry, nrow(layout$nz))
+    out[layout$nz] = hits
+    out
 }
 
 # Predict class labels, uniformly as a character vector regardless of classifier
@@ -120,10 +151,12 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
             "matrix of counts.", call. = FALSE)
     }
     keep = keep & !is.na(keep)
-    fit = trainClassifier(scaledMat[balancedIdx, keep, drop = FALSE], labels[balancedIdx], classifier, ntree = ntree)
+    # the forest's own random streams, apart from those of the resamples below
+    if (!is.null(seed)) BiocParallel::bpRNGseed(BPPARAM) = seed + 7919L
+    fit = trainClassifier(scaledMat[balancedIdx, keep, drop = FALSE], labels[balancedIdx], classifier, ntree = ntree,
+        BPPARAM = BPPARAM)
     message("Finished training classifier.")
 
-    totals = rowSums(countMat)
 
     # plain set.seed() before bplapply() does NOT make forked MulticoreParam
     # workers reproducible - the seed has to be set on the BPPARAM itself. Each
@@ -131,15 +164,9 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
     # number of workers.
     if (!is.null(seed)) BiocParallel::bpRNGseed(BPPARAM) = seed
 
+    layout = resampleLayout(countMat)
     preds = BiocParallel::bplapply(seq_len(nBoot), function(b) {
-        bootMat = t(vapply(seq_len(nrow(countMat)), function(i) {
-            if (totals[i] == 0) {
-                return(integer(ncol(countMat)))
-            }
-            as.integer(stats::rmultinom(1, totals[i], countMat[i, ]))
-        }, integer(ncol(countMat))))
-        colnames(bootMat) = colnames(countMat)
-
+        bootMat = resampleCounts(layout)
         predictClassifierClass(fit, scaleCountMat(bootMat)[, keep, drop = FALSE], classifier)
     }, BPPARAM = BPPARAM)
 
