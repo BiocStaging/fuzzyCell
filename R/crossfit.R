@@ -19,7 +19,7 @@ predictClassifierProb = function(fit, newx, classifier = c("logistic", "rf", "ld
 # scored by a classifier that saw it.
 crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed = NULL,
                             classifier = c("logistic", "rf", "lda"), ntree = 500,
-                            priors = c("balanced", "observed")) {
+                            priors = c("balanced", "observed"), BPPARAM = BiocParallel::SerialParam()) {
     classifier = match.arg(classifier)
     priors = match.arg(priors)
     labels = as.character(labels)
@@ -31,7 +31,10 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
     classes = sort(unique(labels))
     fold = sample(rep(seq_len(nFolds), length.out = length(labels)))
     out = matrix(NA_real_, length(labels), length(classes), dimnames = list(NULL, classes))
-    for (k in seq_len(nFolds)) {
+    # one fold per task; each draws its balanced training set from its own random stream
+    seeds = sample.int(.Machine$integer.max, nFolds)
+    fits = BiocParallel::bplapply(seq_len(nFolds), function(k) {
+        set.seed(seeds[k])
         train = which(fold != k)
         sizes = table(labels[train])
         targetSize = max(min(sizes), nPerClass)
@@ -41,9 +44,9 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
         }))
         fit = trainClassifier(scaledMat[balancedIdx, , drop = FALSE], labels[balancedIdx], classifier, ntree = ntree)
         test = which(fold == k)
-        p = predictClassifierProb(fit, scaledMat[test, , drop = FALSE], classifier)
-        out[test, colnames(p)] = p
-    }
+        list(test = test, p = predictClassifierProb(fit, scaledMat[test, , drop = FALSE], classifier))
+    }, BPPARAM = BPPARAM)
+    for (f in fits) out[f$test, colnames(f$p)] = f$p
     out[is.na(out)] = 0
     if (priors == "observed") {
         out = sweep(out, 2, c(table(factor(labels, levels = classes))) / length(labels), "*")
@@ -68,6 +71,8 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #'   [bootstrapClassify()].
 #' @param priors `"balanced"` (equal priors, as the classifier is trained) or
 #'   `"observed"` (each class weighted by its share of the group's cells).
+#' @param BPPARAM A [BiocParallel::BiocParallelParam-class] object; the folds
+#'   are fitted in parallel on its workers.
 #'
 #' @return A confidence list in the format of [bootstrapLineageConfidence()],
 #'   with probabilities in place of bootstrap confidences.
@@ -82,7 +87,7 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #' @export
 crossfitLineageProbabilities = function(spe, cellTypeTree, nFolds = 5, nPerClass = 50, seed = 51773,
                                         classifier = c("logistic", "rf", "lda"), ntree = 500,
-                                        priors = c("balanced", "observed"),
+                                        priors = c("balanced", "observed"), BPPARAM = BiocParallel::SerialParam(),
                                         skipGroups = character(0), cellType = "cellType",
                                         cellID = "cellID", assayName = "counts") {
     classifier = match.arg(classifier)
@@ -100,7 +105,7 @@ crossfitLineageProbabilities = function(spe, cellTypeTree, nFolds = 5, nPerClass
         countMat = denseCounts(assay(spe[, idx], assayName))
         p = crossfitClassify(countMat, labels, nFolds = nFolds, nPerClass = nPerClass,
             seed = if (is.null(seed)) NULL else seed + gi, classifier = classifier, ntree = ntree,
-            priors = priors)
+            priors = priors, BPPARAM = BPPARAM)
         message(sprintf("[%d/%d] Lineage: %s done", gi, length(groups), groups[gi]))
         data.frame(cellID = spe[[cellID]][idx], p, check.names = FALSE)
     })
