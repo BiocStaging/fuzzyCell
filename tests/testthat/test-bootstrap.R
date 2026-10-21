@@ -89,7 +89,7 @@ test_that("bootstrapLineageConfidence records its settings", {
             seed = 10)))
     settings = attr(conf$Grp, "settings")
     expect_equal(settings[c("nBoot", "nPerClass", "classifier", "ntree",
-        "seed")], list(nBoot = 3, nPerClass = 20, classifier = "logistic",
+        "seed")], list(nBoot = 3, nPerClass = 20, classifier = "pcaLogistic",
         ntree = 500, seed = 11))
     expect_setequal(settings$children, c("A", "B"))
     expect_true("stBootVersion" %in% names(settings))

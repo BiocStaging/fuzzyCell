@@ -110,7 +110,7 @@ The same tree is also included in the package as `heartCellTypeTree`.
 
 The function `bootstrapLineageConfidence` trains a classifier within each group and repeatedly re-classifies each cell after multinomially resampling its raw transcript counts. A cell's confidence for a subtype is the fraction of resamples in which it was assigned to that subtype. We use 20 resamples to keep the vignette quick, but we encourage using at least 100 bootstraps for your analysis.
 
-The classifier is ridge multinomial logistic regression by default (`classifier = "logistic"`); `"pcaLogistic"` fits it on the first 50 principal components, which is faster and often more accurate for panels of thousands of genes, and `"rf"`, `"lda"` and `"svm"` are also available. The classifier is trained with the same number of cells of each subtype, which gives every subtype the same prior; `priors = "observed"` instead weights each subtype by its share of the group's cells, so that a cell is not drawn towards a rare subtype only because the subtypes were balanced in training.
+The classifier is ridge multinomial logistic regression on the first 50 principal components of each group's cells by default (`classifier = "pcaLogistic"`); `"logistic"` fits it on all genes, and `"rf"`, `"lda"` and `"svm"` are also available. The classifier is trained with the same number of cells of each subtype, which gives every subtype the same prior; `priors = "observed"` instead weights each subtype by its share of the group's cells, so that a cell is not drawn towards a rare subtype only because the subtypes were balanced in training.
 
 ```{r bootstrap, results = "hide"}
 confList = bootstrapLineageConfidence(spe, tree, nBoot = 20, seed = 1)

@@ -6,8 +6,8 @@
   allowed. New `effect` argument (`"allocation"` or `"count"`).
 * Niches (`runNicheIdentification()`) cluster lisaClust's local curves with the weights (`lisaClust::lisa()`).
 * `confidenceWeights()` turns a confidence list into the cells x labels weight matrix spicyR and lisaClust take.
-* The default classifier is ridge multinomial logistic regression (`classifier = "logistic"`, glmnet);
-  `"pcaLogistic"` fits it on the first 50 principal components.
+* The default classifier is ridge multinomial logistic regression on the first 50 principal components
+  (`classifier = "pcaLogistic"`, glmnet and irlba); `"logistic"` fits it on all genes.
 * `priors = "observed"` weights each class by its share of the group's cells instead of equally.
 * `crossfitLineageProbabilities()`: cross-fitted class probabilities, an alternative to the bootstrap.
 * The bootstrap resamples all cells' counts in one pass, grows a random forest on the workers, and accepts sparse
