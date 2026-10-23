@@ -165,7 +165,7 @@ bootstrapLineageInSubprocess = function(countMat, labels, nBoot, nPerClass, BPPA
     callr::r(
         func = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, classifier, ntree) {
             set.seed(seed)
-            stBoot::bootstrapClassify(countMat, labels,
+            fuzzyCell::bootstrapClassify(countMat, labels,
                 nBoot = nBoot, nPerClass = nPerClass, BPPARAM = BPPARAM,
                 seed = seed, classifier = classifier, ntree = ntree
             )
@@ -269,7 +269,7 @@ checkpointSettingsDiff = function(stored, current) {
 #' @param cellTypeTree A cell type tree, see [cellTypeTree].
 #' @param checkpointDir If given, each group's result is saved there as
 #'   soon as it finishes, and re-running resumes from existing files. Each
-#'   group then runs in a fresh `callr` subprocess, which requires stBoot to
+#'   group then runs in a fresh `callr` subprocess, which requires fuzzyCell to
 #'   be installed.
 #' @param skipGroups Names of groups to leave out of the result.
 #' @param seed Random seed, or `NULL` for no fixed seed. Each group is
@@ -285,7 +285,7 @@ checkpointSettingsDiff = function(stored, current) {
 #'   to 1 across the child columns).
 #'   Each data frame also carries a `"settings"` attribute recording how it
 #'   was computed (`nBoot`, `nPerClass`, `classifier`, `ntree`, the group's
-#'   `seed`, its `children` and the `stBootVersion`), which is also saved in
+#'   `seed`, its `children` and the `fuzzyCellVersion`), which is also saved in
 #'   checkpoint files. When resuming from a checkpoint, a message reports
 #'   the stored classifier and any settings that differ from the current call.
 #'
@@ -352,7 +352,7 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
         settings = list(
             nBoot = nBoot, nPerClass = nPerClass, classifier = classifier,
             ntree = ntree, seed = groupSeed, children = unique(labels),
-            stBootVersion = tryCatch(as.character(utils::packageVersion("stBoot")),
+            fuzzyCellVersion = tryCatch(as.character(utils::packageVersion("fuzzyCell")),
                 error = function(e) NA_character_)
         )
 

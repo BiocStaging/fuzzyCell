@@ -4,7 +4,7 @@ quiet = function(x) suppressWarnings(suppressMessages(x))
 test_that("unweighted proportions sum to one per image", {
     cells = data.frame(imageID = rep(c("a", "b"), c(5, 3)),
         cellType = c("T", "T", "B", "B", "B", "T", "B", "B"))
-    props = stBoot:::calcUnweightedProportions(cells)
+    props = fuzzyCell:::calcUnweightedProportions(cells)
     expect_equal(unname(rowSums(props)), c(1, 1))
     expect_equal(props["a", "T"], 2 / 5, ignore_attr = TRUE)
 })
@@ -21,7 +21,7 @@ perImage = function(outcome, subjects = imgs) {
 test_that("runProportionModels skips cell types with too little data", {
     p = matrix(c(0.2, 0.3, 0.4, 0.1), 2, 2, dimnames = list(c("a", "b"), c("T", "B")))
     cells = data.frame(imageID = c("a", "b"), outcome = c("x", "y"))
-    res = stBoot:::runProportionModels(p, cells, "outcome")
+    res = fuzzyCell:::runProportionModels(p, cells, "outcome")
     expect_equal(nrow(res), 2)
     expect_true(all(is.na(res$p.value)))
 })
@@ -30,30 +30,30 @@ test_that("runProportionModels estimates second level minus first", {
     # images 1-4 are "ctrl", 5-9 are "case"; alphabetically "case" is the first
     # level, so the estimate is mean(ctrl) - mean(case)
     cells = perImage(rep(c("ctrl", "case"), c(4, 5)))
-    res = stBoot:::runProportionModels(props, cells, "outcome")
+    res = fuzzyCell:::runProportionModels(props, cells, "outcome")
     expect_equal(res$estimate[res$cellType == "T"],
         mean(props[1:4, "T"]) - mean(props[5:9, "T"]))
 })
 
 test_that("runProportionModels checks the outcome and subjects", {
-    expect_error(stBoot:::runProportionModels(props, perImage(rep(c("a", "b", "c"), each = 3)),
+    expect_error(fuzzyCell:::runProportionModels(props, perImage(rep(c("a", "b", "c"), each = 3)),
         "outcome"), "has 3 levels \\(a, b, c\\)\\. The models currently compare two conditions only")
     mixed = data.frame(imageID = rep(imgs, each = 2), outcome = rep(c("a", "b"), 9))
-    expect_error(stBoot:::runProportionModels(props, mixed, "outcome"),
+    expect_error(fuzzyCell:::runProportionModels(props, mixed, "outcome"),
         "must have a single value per image")
-    expect_error(stBoot:::runProportionModels(props, perImage(rep(c("a", "b"), c(4, 5))), "nope"),
+    expect_error(fuzzyCell:::runProportionModels(props, perImage(rep(c("a", "b"), c(4, 5))), "nope"),
         "`outcomeCol = \"nope\"` is not a column of the data")
     shared = perImage(rep(c("a", "b"), c(4, 5)), c("p1", "p1", paste0("p", 3:9)))
-    expect_error(stBoot:::runProportionModels(props, shared, "outcome", subject = "subject"),
+    expect_error(fuzzyCell:::runProportionModels(props, shared, "outcome", subject = "subject"),
         "has more than one image for 1 subject: p1 \\(img1, img2\\)")
-    expect_no_error(stBoot:::runProportionModels(props, perImage(rep(c("a", "b"), c(4, 5)),
+    expect_no_error(fuzzyCell:::runProportionModels(props, perImage(rep(c("a", "b"), c(4, 5)),
         paste0("p", 1:9)), "outcome", subject = "subject"))
 })
 
 test_that("runProportionModels accepts column names that are not syntactic", {
     cells = perImage(rep(c("ctrl", "case"), c(4, 5)))
     names(cells)[2] = "my outcome"
-    expect_equal(nrow(stBoot:::runProportionModels(props, cells, "my outcome")), 2)
+    expect_equal(nrow(fuzzyCell:::runProportionModels(props, cells, "my outcome")), 2)
 })
 
 ## ---- the pipelines ------------------------------------------------------------
@@ -114,8 +114,8 @@ test_that("proportions relative to parent are within [0, 1]", {
 
 test_that("calcProportionsRelativeToParent works on annotated or plain cells", {
     cells = getCellData(d$spe)
-    plain = stBoot:::calcProportionsRelativeToParent(cells, d$tree, d$conf)
-    annotated = stBoot:::calcProportionsRelativeToParent(
+    plain = fuzzyCell:::calcProportionsRelativeToParent(cells, d$tree, d$conf)
+    annotated = fuzzyCell:::calcProportionsRelativeToParent(
         annotateCellTypeTree(cells, d$tree), d$tree, d$conf)
     expect_equal(plain, annotated)
 })
@@ -207,7 +207,7 @@ test_that("the pipelines take custom column names", {
 })
 
 test_that("the dead weighted-proportion helper is gone", {
-    expect_false("calcWeightedProportions" %in% getNamespaceExports("stBoot"))
+    expect_false("calcWeightedProportions" %in% getNamespaceExports("fuzzyCell"))
 })
 
 test_that("proportion pipelines return models (full data)", {

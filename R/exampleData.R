@@ -1,14 +1,14 @@
 #' Heart transplant example data
 #'
 #' Downloads the Amancherla et al. (2025) heart transplant Xenium dataset from
-#' the SpatialDatasets package (via ExperimentHub) and prepares it for stBoot:
-#' renames the columns stBoot expects, keeps patients with cellular rejection,
+#' the SpatialDatasets package (via ExperimentHub) and prepares it for fuzzyCell:
+#' renames the columns fuzzyCell expects, keeps patients with cellular rejection,
 #' and keeps one randomly chosen image per patient for each biopsy timing.
 #' The first call downloads the data, which is large. With `"both"` every patient
 #' has an image before and after transplant, so those images are not independent
 #' and cannot be passed together to [runColocalisationModels()] with `subject = "subject"`.
 #'
-#' The prepared object has the columns stBoot functions use: `cellID`,
+#' The prepared object has the columns fuzzyCell functions use: `cellID`,
 #' `imageID`, `cellType`, `x`, `y` and `subject`, and the per-patient outcome
 #' `resolution_broad` (`"persistence"` or `"resolved"`). The cell type
 #' hierarchy for these cell types is in [heartCellTypeTree].

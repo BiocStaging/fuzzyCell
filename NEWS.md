@@ -1,4 +1,4 @@
-# stBoot 0.99.0
+# fuzzyCell 0.99.0
 
 * Initial package, prepared for Bioconductor submission.
 * Bootstrap classification confidence (`bootstrapLineageConfidence()`).

@@ -10,7 +10,7 @@
 #' Returns `colData(spe)` as a `data.frame`. For a `SpatialExperiment` whose
 #' coordinates are stored in `spatialCoords()` rather than in `colData()`,
 #' the coordinates are added as columns `x` and `y`. The spatial functions in
-#' stBoot expect `cellID`, `imageID`, `cellType`, `x` and `y` columns.
+#' fuzzyCell expect `cellID`, `imageID`, `cellType`, `x` and `y` columns.
 #'
 #' @param spe A `SummarizedExperiment` or `SpatialExperiment`.
 #'

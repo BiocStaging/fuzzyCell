@@ -1,10 +1,10 @@
-Package: stBoot
+Package: fuzzyCell
 Type: Package
 Title: Bootstrap Classification Confidence for Spatial Cell-Type Analysis
 Version: 0.99.0
 Authors@R: person("Shreya", "Rao", email = "shreya.rajeshrao@sydney.edu.au", role = c("aut", "cre"))
 Description: Cell type labels in spatial single-cell data are
-    uncertain, particularly between closely related subtypes. stBoot estimates
+    uncertain, particularly between closely related subtypes. fuzzyCell estimates
     a per-cell classification confidence by bootstrapping (multinomial
     resampling of each cell's counts followed by re-classification) and uses
     the resulting confidences as soft cell type weights. The weights are
@@ -14,8 +14,8 @@ Description: Cell type labels in spatial single-cell data are
     lineages, groups and subtypes. Helpers for testing against sample-level
     outcomes and for plotting are included.
 License: GPL (>= 3)
-URL: https://github.com/shreyarajeshrao/scBoot
-BugReports: https://github.com/shreyarajeshrao/scBoot/issues
+URL: https://github.com/shreyarajeshrao/fuzzyCell
+BugReports: https://github.com/shreyarajeshrao/fuzzyCell/issues
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 biocViews: Software, Spatial, SingleCell, Classification, Clustering,

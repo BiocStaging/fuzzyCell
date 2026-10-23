@@ -152,7 +152,7 @@ test_that("plotMetricBoxplot takes lfunction or kontextual", {
         expect_s3_class(p, "girafe")
 
         # boxplots and points, with no lines joining the points
-        gg = stBoot:::metricBoxplotGG(res, cells, "A", "B", "outcome", metric)
+        gg = fuzzyCell:::metricBoxplotGG(res, cells, "A", "B", "outcome", metric)
         geoms = vapply(gg$layers, function(l) class(l$geom)[1], "")
         expect_gt(length(geoms), 0)
         expect_true("GeomBoxplot" %in% geoms)
@@ -169,7 +169,7 @@ test_that("plotMetricBoxplot takes lfunction or kontextual", {
 })
 
 test_that("the removed plot functions are no longer exported", {
-    exports = getNamespaceExports("stBoot")
+    exports = getNamespaceExports("fuzzyCell")
     expect_false("plotConfidenceMarkers" %in% exports)
     expect_false("plotPValComparison" %in% exports)
     expect_true("testNicheOutcome" %in% exports)
@@ -188,7 +188,7 @@ test_that("plotProportionBoxplot handles both proportion pipelines", {
         p = plotProportionBoxplot(res, "A", d$spe, "outcome")
         expect_s3_class(p, "girafe")
 
-        gg = stBoot:::proportionBoxplotGG(res, "A", cells, "outcome")
+        gg = fuzzyCell:::proportionBoxplotGG(res, "A", cells, "outcome")
         geoms = vapply(gg$layers, function(l) class(l$geom)[1], "")
         expect_true("GeomBoxplot" %in% geoms, info = nm)
         expect_false("GeomLine" %in% geoms, info = nm)
@@ -197,9 +197,9 @@ test_that("plotProportionBoxplot handles both proportion pipelines", {
         expect_equal(levels(gg$data$type), c("Unweighted", "Weighted"), info = nm)
     }
     # the axis says what the proportion is of
-    expect_equal(stBoot:::proportionBoxplotGG(pipelines$all, "A", cells,
+    expect_equal(fuzzyCell:::proportionBoxplotGG(pipelines$all, "A", cells,
         "outcome")$labels$y, "Proportion of all cells")
-    expect_equal(stBoot:::proportionBoxplotGG(pipelines$parent, "A", cells,
+    expect_equal(fuzzyCell:::proportionBoxplotGG(pipelines$parent, "A", cells,
         "outcome")$labels$y, "Proportion of G cells")
     # whole groups and ungrouped cell types are available in the main pipeline
     expect_no_error(plotProportionBoxplot(pipelines$all, "G", d$spe, "outcome"))
@@ -234,7 +234,7 @@ test_that("nicheProportionBoxplot plots the table it is given", {
         expect_s3_class(nicheProportionBoxplot(props, "niche1", spe, "outcome"), "girafe")
 
         # the table decides which niches are plotted, and the title says which
-        gg = stBoot:::nicheProportionBoxplotGG(props, "niche1", cells, "outcome")
+        gg = fuzzyCell:::nicheProportionBoxplotGG(props, "niche1", cells, "outcome")
         expect_equal(gg$labels$title, paste0("niche1 (", type, ")"))
         expect_equal(nrow(gg$data), sum(props$niche == "niche1"))
         geoms = vapply(gg$layers, function(l) class(l$geom)[1], "")
@@ -244,8 +244,8 @@ test_that("nicheProportionBoxplot plots the table it is given", {
     expect_false("weighted" %in% names(formals(nicheProportionBoxplot)))
 
     # the two tables really are different plots
-    w = stBoot:::nicheProportionBoxplotGG(tests$propWeighted, "niche1", cells, "outcome")
-    u = stBoot:::nicheProportionBoxplotGG(tests$propUnweighted, "niche1", cells, "outcome")
+    w = fuzzyCell:::nicheProportionBoxplotGG(tests$propWeighted, "niche1", cells, "outcome")
+    u = fuzzyCell:::nicheProportionBoxplotGG(tests$propUnweighted, "niche1", cells, "outcome")
     expect_false(isTRUE(all.equal(w$data$proportion, u$data$proportion)) &&
         w$labels$title == u$labels$title)
 })
