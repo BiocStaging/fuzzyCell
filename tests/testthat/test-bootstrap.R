@@ -95,6 +95,29 @@ test_that("bootstrapLineageConfidence records its settings", {
     expect_true("fuzzyCellVersion" %in% names(settings))
 })
 
+test_that("subprocess = TRUE gives the same confidences as running in this session", {
+    d = makeCounts()
+    se = SummarizedExperiment::SummarizedExperiment(
+        list(counts = t(d$counts)),
+        colData = S4Vectors::DataFrame(cellID = paste0("c", 1:80),
+            cellType = d$labels))
+    tree = list(Grp = list(children = c("A", "B")))
+    expect_error(bootstrapLineageConfidence(se, tree, subprocess = NA),
+        "`subprocess` must be TRUE or FALSE")
+    run = function(subprocess) suppressMessages(suppressWarnings(
+        bootstrapLineageConfidence(se, tree, nBoot = 3, nPerClass = 20,
+            seed = 10, subprocess = subprocess)))
+    installed = tryCatch(utils::packageDescription("fuzzyCell",
+        lib.loc = .libPaths())$Version, warning = function(w) NULL)
+    if (is.null(installed)) {
+        expect_error(run(TRUE), "needs fuzzyCell to be installed")
+    }
+    skip_if(is.null(installed) ||
+        !identical(installed, as.character(getNamespaceVersion("fuzzyCell"))),
+        "the installed fuzzyCell is missing or a different version")
+    expect_equal(run(TRUE), run(FALSE))
+})
+
 test_that("bootstrapLineageConfidence requires a SummarizedExperiment", {
     tree = list(Grp = list(children = c("A", "B")))
     for (bad in list(data.frame(cellID = "a", cellType = "A"), NULL, "spe", 1)) {

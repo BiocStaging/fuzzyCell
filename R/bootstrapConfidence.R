@@ -246,6 +246,49 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
     freqMatrix
 }
 
+# Runs bootstrapClassify() for one lineage group in a fresh callr subprocess. A
+# clean subprocess only carries the countMat/labels explicitly passed in as args, so
+# the fork-based nBoot-level parallelism inside it forks from a small heap instead
+# of whatever has accumulated in this session (the spe object, prior lineages'
+# results) - that accumulated heap is what gets duplicated into every worker otherwise,
+# ballooning RSS on large lineages.
+bootstrapLineageInSubprocess = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, wd,
+                                         classifier = "pcaLogistic", ntree = 500, priors = "balanced") {
+    callr::r(
+        func = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, classifier, ntree, priors) {
+            fuzzyCell::bootstrapClassify(countMat, labels,
+                nBoot = nBoot, nPerClass = nPerClass, BPPARAM = BPPARAM,
+                seed = seed, classifier = classifier, ntree = ntree, priors = priors
+            )
+        },
+        args = list(
+            countMat = countMat, labels = labels, nBoot = nBoot,
+            nPerClass = nPerClass, BPPARAM = BPPARAM, seed = seed,
+            classifier = classifier, ntree = ntree, priors = priors
+        ),
+        wd = wd,
+        stdout = "", stderr = "" # inherit this session's streams so progress bars still show live
+    )
+}
+
+# The subprocess loads fuzzyCell from the library, not this session's copy, so
+# checks that it is installed and is the same version as the one running here
+# (e.g. under devtools::load_all() the installed copy may be older).
+checkSubprocessInstall = function() {
+    installed = tryCatch(utils::packageDescription("fuzzyCell", lib.loc = .libPaths())$Version,
+        warning = function(w) NULL, error = function(e) NULL)
+    if (is.null(installed)) {
+        stop("`subprocess = TRUE` runs each group in a fresh R session, which needs fuzzyCell to be installed. ",
+            "Install it, or use `subprocess = FALSE`.", call. = FALSE)
+    }
+    running = as.character(getNamespaceVersion("fuzzyCell"))
+    if (!identical(installed, running)) {
+        stop("`subprocess = TRUE` would run the installed fuzzyCell ", installed, ", but this session is running ",
+            running, ". Install this version, or use `subprocess = FALSE`.", call. = FALSE)
+    }
+    invisible(TRUE)
+}
+
 #' Bootstrap confidence scores for every group in a cell type tree
 #'
 #' For each group in `cellTypeTree` that has children (see [cellTypeTree]),
@@ -265,6 +308,11 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
 #' @param assayName Name of the assay with the raw counts.
 #' @param cellTypeTree A cell type tree, see [cellTypeTree].
 #' @param skipGroups Names of groups to leave out of the result.
+#' @param subprocess If `TRUE`, each group is bootstrapped in a fresh R session
+#'   (via callr), which only holds that group's counts. With a forking backend
+#'   such as [BiocParallel::MulticoreParam()], every worker starts as a copy of
+#'   the session it is forked from, so this keeps the workers small on large
+#'   data. It requires the same version of fuzzyCell to be installed.
 #' @param seed Random seed, or `NULL` for no fixed seed. Each group is
 #'   bootstrapped with `seed` plus its position in the list of groups, so every
 #'   group is reproducible independently of the others.
@@ -292,13 +340,17 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
 #' @export
 bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass = 50,
                                        BPPARAM = BiocParallel::SerialParam(), seed = 51773,
-                                       skipGroups = character(0),
+                                       skipGroups = character(0), subprocess = FALSE,
                                        classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"), ntree = 500,
                                        priors = c("balanced", "observed"),
                                        cellType = "cellType", cellID = "cellID",
                                        assayName = "counts") {
     classifier = match.arg(classifier)
     priors = match.arg(priors)
+    if (!is.logical(subprocess) || length(subprocess) != 1 || is.na(subprocess)) {
+        stop("`subprocess` must be TRUE or FALSE", call. = FALSE)
+    }
+    if (subprocess) checkSubprocessInstall()
 
     checkSpe(spe)
     checkColumn(spe, cellType, "cellType")
@@ -353,10 +405,16 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
 
         countMat = denseCounts(assay(spe[, idx], assayName))
 
-        freqMatrix = bootstrapClassify(countMat, labels,
-            nBoot = nBoot, nPerClass = nPerClass,
-            BPPARAM = BPPARAM, seed = groupSeed, classifier = classifier, ntree = ntree, priors = priors
-        )
+        freqMatrix = if (subprocess) {
+            bootstrapLineageInSubprocess(countMat, labels, nBoot, nPerClass, BPPARAM, groupSeed,
+                wd = getwd(), classifier = classifier, ntree = ntree, priors = priors
+            )
+        } else {
+            bootstrapClassify(countMat, labels,
+                nBoot = nBoot, nPerClass = nPerClass,
+                BPPARAM = BPPARAM, seed = groupSeed, classifier = classifier, ntree = ntree, priors = priors
+            )
+        }
 
         message(sprintf(
             "[%d/%d] Lineage: %s done in %.1fs",

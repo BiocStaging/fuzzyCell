@@ -25,6 +25,7 @@ Depends: R (>= 4.5.0)
 Imports:
     BiocGenerics,
     BiocParallel,
+    callr,
     dplyr,
     e1071,
     forcats,

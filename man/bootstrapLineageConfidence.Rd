@@ -12,6 +12,7 @@ bootstrapLineageConfidence(
   BPPARAM = BiocParallel::SerialParam(),
   seed = 51773,
   skipGroups = character(0),
+  subprocess = FALSE,
   classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"),
   ntree = 500,
   priors = c("balanced", "observed"),
@@ -42,6 +43,12 @@ bootstrapped with \code{seed} plus its position in the list of groups, so every
 group is reproducible independently of the others.}
 
 \item{skipGroups}{Names of groups to leave out of the result.}
+
+\item{subprocess}{If \code{TRUE}, each group is bootstrapped in a fresh R session
+(via callr), which only holds that group's counts. With a forking backend
+such as \code{\link[BiocParallel:MulticoreParam]{BiocParallel::MulticoreParam()}}, every worker starts as a copy of
+the session it is forked from, so this keeps the workers small on large
+data. It requires the same version of fuzzyCell to be installed.}
 
 \item{classifier}{One of \code{"pcaLogistic"} (ridge multinomial logistic
 regression, via glmnet, with the penalty chosen by cross-validation, on the
