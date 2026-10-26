@@ -11,7 +11,6 @@ bootstrapLineageConfidence(
   nPerClass = 50,
   BPPARAM = BiocParallel::SerialParam(),
   seed = 51773,
-  checkpointDir = NULL,
   skipGroups = character(0),
   classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"),
   ntree = 500,
@@ -41,11 +40,6 @@ backend and number of workers is used.}
 \item{seed}{Random seed, or \code{NULL} for no fixed seed. Each group is
 bootstrapped with \code{seed} plus its position in the list of groups, so every
 group is reproducible independently of the others.}
-
-\item{checkpointDir}{If given, each group's result is saved there as
-soon as it finishes, and re-running resumes from existing files. Each
-group then runs in a fresh \code{callr} subprocess, which requires fuzzyCell to
-be installed.}
 
 \item{skipGroups}{Names of groups to leave out of the result.}
 
@@ -80,10 +74,8 @@ column, and one column per child cell type of the group holding the
 cell's confidence score for that cell type (between 0 and 1, rows summing
 to 1 across the child columns).
 Each data frame also carries a \code{"settings"} attribute recording how it
-was computed (\code{nBoot}, \code{nPerClass}, \code{classifier}, \code{ntree}, the group's
-\code{seed}, its \code{children} and the \code{fuzzyCellVersion}), which is also saved in
-checkpoint files. When resuming from a checkpoint, a message reports
-the stored classifier and any settings that differ from the current call.
+was computed (\code{nBoot}, \code{nPerClass}, \code{classifier}, \code{priors}, \code{ntree}, the
+group's \code{seed}, its \code{children} and the \code{fuzzyCellVersion}).
 }
 \description{
 For each group in \code{cellTypeTree} that has children (see \link{cellTypeTree}),
@@ -92,9 +84,6 @@ confidence score for each of the group's child cell types. The result is
 the \code{confList} used by the downstream analyses, such as
 \code{\link[=runProportionsPipeline]{runProportionsPipeline()}} and \code{\link[=runColocalisationModels]{runColocalisationModels()}}. Cell types without a
 group (ungrouped leaves) are not refined and keep hard labels.
-}
-\details{
-Use \code{\link[=loadCheckpointedConfList]{loadCheckpointedConfList()}} to reload the result from checkpoint files.
 }
 \examples{
 \donttest{

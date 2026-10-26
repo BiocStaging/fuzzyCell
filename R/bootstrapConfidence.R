@@ -246,99 +246,6 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
     freqMatrix
 }
 
-# Runs bootstrapClassify() for one lineage group in a fresh callr subprocess. A
-# clean subprocess only carries the countMat/labels explicitly passed in as args, so
-# the fork-based nBoot-level parallelism inside it forks from a small heap instead
-# of  whatever has accumulated in this session (the spe object, prior lineages'
-# results) - that accumulated heap is what gets duplicated into every worker otherwise,
-# ballooning RSS on large lineages.
-bootstrapLineageInSubprocess = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, wd,
-                                         classifier = "rf", ntree = 500, priors = "balanced") {
-    callr::r(
-        func = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, classifier, ntree, priors) {
-            set.seed(seed)
-            fuzzyCell::bootstrapClassify(countMat, labels,
-                nBoot = nBoot, nPerClass = nPerClass, BPPARAM = BPPARAM,
-                seed = seed, classifier = classifier, ntree = ntree, priors = priors
-            )
-        },
-        args = list(
-            countMat = countMat, labels = labels, nBoot = nBoot,
-            nPerClass = nPerClass, BPPARAM = BPPARAM, seed = seed,
-            classifier = classifier, ntree = ntree, priors = priors
-        ),
-        wd = wd,
-        stdout = "", stderr = "" # inherit this session's streams so progress bars still show live
-    )
-}
-
-# Reassembles a confList purely from already-written checkpoint files, without
-# recomputing anything or needing spe/counts data at all. skipGroups must match
-# whatever was passed to the original bootstrapLineageConfidence() call, so the two lists
-# of "groups that should have a checkpoint" line up.
-#' Reload bootstrap confidence scores from checkpoint files
-#'
-#' Rebuilds the `confList` returned by [bootstrapLineageConfidence()] purely
-#' from checkpoint files written by an earlier call with `checkpointDir` set,
-#' without recomputing anything or needing the expression data.
-#'
-#' @param cellTypeTree The cell type tree used in the original call, see
-#'   [cellTypeTree].
-#' @param checkpointDir The directory the checkpoint files (one `.rds` file
-#'   per group) were written to.
-#' @param skipGroups Names of groups to leave out. Must match the
-#'   `skipGroups` of the original call, so that the groups expected to have a
-#'   checkpoint line up.
-#'
-#' @return A named list with one `data.frame` per group, in the same format as
-#'   the result of [bootstrapLineageConfidence()]. An error is raised if a
-#'   group's checkpoint file is missing.
-#'
-#' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' dir = tempfile()
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1, checkpointDir = dir)
-#' confList2 = loadCheckpointedConfList(heartCellTypeTree, dir)
-#' identical(confList, confList2)
-#' }
-#' @export
-loadCheckpointedConfList = function(cellTypeTree, checkpointDir, skipGroups = character(0)) {
-    groups = setdiff(buildCellTypeMap(cellTypeTree)$groupsWithChildren, skipGroups)
-
-    confList = lapply(groups, function(g) {
-        checkpointFile = file.path(checkpointDir, paste0(make.names(g), ".rds"))
-        if (!file.exists(checkpointFile)) stop("No checkpoint file for lineage: ", g, " (", checkpointFile, ")")
-        readRDS(checkpointFile)
-    })
-    names(confList) = groups
-    confList
-}
-
-
-# Describes how the settings stored in a checkpoint differ from those of the
-# current call: returns a character vector with one entry per difference
-# (empty if they match). `ntree` only matters for random forests.
-checkpointSettingsDiff = function(stored, current) {
-    fmt = function(x) if (is.null(x)) "NULL" else paste(x, collapse = ", ")
-    same = function(a, b) isTRUE(all.equal(a, b))
-    diffs = character(0)
-    for (nm in c("nBoot", "nPerClass", "classifier", "ntree", "seed", "priors")) {
-        if (nm == "ntree" && !"rf" %in% c(stored$classifier, current$classifier)) next
-        if (!same(stored[[nm]], current[[nm]])) {
-            diffs = c(diffs, sprintf("%s (checkpoint: %s, this call: %s)",
-                nm, fmt(stored[[nm]]), fmt(current[[nm]])))
-        }
-    }
-    if (!setequal(stored$children, current$children)) {
-        diffs = c(diffs, sprintf("child cell types (checkpoint: %s; this call: %s)",
-            fmt(stored$children), fmt(current$children)))
-    }
-    diffs
-}
-
 #' Bootstrap confidence scores for every group in a cell type tree
 #'
 #' For each group in `cellTypeTree` that has children (see [cellTypeTree]),
@@ -347,8 +254,6 @@ checkpointSettingsDiff = function(stored, current) {
 #' the `confList` used by the downstream analyses, such as
 #' [runProportionsPipeline()] and [runColocalisationModels()]. Cell types without a
 #' group (ungrouped leaves) are not refined and keep hard labels.
-#'
-#' Use [loadCheckpointedConfList()] to reload the result from checkpoint files.
 #'
 #' @inheritParams bootstrapClassify
 #' @param spe A `SummarizedExperiment` (e.g. `SpatialExperiment`) with a counts
@@ -359,10 +264,6 @@ checkpointSettingsDiff = function(stored, current) {
 #'   They are returned in the `cellID` column of each result.
 #' @param assayName Name of the assay with the raw counts.
 #' @param cellTypeTree A cell type tree, see [cellTypeTree].
-#' @param checkpointDir If given, each group's result is saved there as
-#'   soon as it finishes, and re-running resumes from existing files. Each
-#'   group then runs in a fresh `callr` subprocess, which requires fuzzyCell to
-#'   be installed.
 #' @param skipGroups Names of groups to leave out of the result.
 #' @param seed Random seed, or `NULL` for no fixed seed. Each group is
 #'   bootstrapped with `seed` plus its position in the list of groups, so every
@@ -376,10 +277,8 @@ checkpointSettingsDiff = function(stored, current) {
 #'   cell's confidence score for that cell type (between 0 and 1, rows summing
 #'   to 1 across the child columns).
 #'   Each data frame also carries a `"settings"` attribute recording how it
-#'   was computed (`nBoot`, `nPerClass`, `classifier`, `ntree`, the group's
-#'   `seed`, its `children` and the `fuzzyCellVersion`), which is also saved in
-#'   checkpoint files. When resuming from a checkpoint, a message reports
-#'   the stored classifier and any settings that differ from the current call.
+#'   was computed (`nBoot`, `nPerClass`, `classifier`, `priors`, `ntree`, the
+#'   group's `seed`, its `children` and the `fuzzyCellVersion`).
 #'
 #' @examples
 #' \donttest{
@@ -392,7 +291,7 @@ checkpointSettingsDiff = function(stored, current) {
 #' }
 #' @export
 bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass = 50,
-                                       BPPARAM = BiocParallel::SerialParam(), seed = 51773, checkpointDir = NULL,
+                                       BPPARAM = BiocParallel::SerialParam(), seed = 51773,
                                        skipGroups = character(0),
                                        classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"), ntree = 500,
                                        priors = c("balanced", "observed"),
@@ -415,11 +314,8 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
     spe = annotateCellTypeTree(spe, cellTypeTree, cellType = cellType)
     groups = setdiff(buildCellTypeMap(cellTypeTree)$groupsWithChildren, skipGroups)
 
-    if (!is.null(checkpointDir)) dir.create(checkpointDir, recursive = TRUE, showWarnings = FALSE)
-
     confList = lapply(seq_along(groups), function(gi) {
         g = groups[gi]
-        checkpointFile = if (!is.null(checkpointDir)) file.path(checkpointDir, paste0(make.names(g), ".rds"))
 
         idx = which(spe$group == g)
         labels = spe[[cellType]][idx]
@@ -437,41 +333,17 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
         }
 
         # distinct-but-deterministic seed per lineage: makes each lineage
-        # independently reproducible regardless of run/resume order.
+        # independently reproducible regardless of the other groups.
         # stays NULL (no fixed seed) when seed is NULL.
         groupSeed = if (is.null(seed)) NULL else seed + gi
 
-        # how this group is bootstrapped, recorded with the result so a
-        # checkpoint can later be compared with the settings of a re-run
+        # how this group is bootstrapped, recorded with the result
         settings = list(
             nBoot = nBoot, nPerClass = nPerClass, classifier = classifier, priors = priors,
             ntree = ntree, seed = groupSeed, children = unique(labels),
             fuzzyCellVersion = tryCatch(as.character(utils::packageVersion("fuzzyCell")),
                 error = function(e) NA_character_)
         )
-
-        if (!is.null(checkpointFile) && file.exists(checkpointFile)) {
-            saved = readRDS(checkpointFile)
-            stored = attr(saved, "settings")
-            prefix = sprintf("[%d/%d] Lineage: %s - already checkpointed, loading from disk", gi, length(groups), g)
-            if (is.null(stored)) {
-                message(prefix, " (no settings recorded, so the classifier and parameters cannot be verified)")
-            } else {
-                model = if (identical(stored$classifier, "rf")) {
-                    sprintf("rf, ntree = %s", stored$ntree)
-                } else {
-                    stored$classifier
-                }
-                message(prefix, sprintf(" (classifier = %s, nBoot = %s)", model, stored$nBoot))
-                diffs = checkpointSettingsDiff(stored, settings)
-                if (length(diffs) > 0) {
-                    message("  Note: the checkpoint for '", g, "' differs from this call: ",
-                        paste(diffs, collapse = "; "), ". Delete ", basename(checkpointFile),
-                        " to recompute it.")
-                }
-            }
-            return(saved)
-        }
 
         message(sprintf(
             "[%d/%d] Lineage: %s (%d cells, %d classes)",
@@ -481,16 +353,10 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
 
         countMat = denseCounts(assay(spe[, idx], assayName))
 
-        freqMatrix = if (!is.null(checkpointDir)) {
-            bootstrapLineageInSubprocess(countMat, labels, nBoot, nPerClass, BPPARAM, groupSeed,
-                wd = getwd(), classifier = classifier, ntree = ntree, priors = priors
-            )
-        } else {
-            bootstrapClassify(countMat, labels,
-                nBoot = nBoot, nPerClass = nPerClass,
-                BPPARAM = BPPARAM, seed = groupSeed, classifier = classifier, ntree = ntree, priors = priors
-            )
-        }
+        freqMatrix = bootstrapClassify(countMat, labels,
+            nBoot = nBoot, nPerClass = nPerClass,
+            BPPARAM = BPPARAM, seed = groupSeed, classifier = classifier, ntree = ntree, priors = priors
+        )
 
         message(sprintf(
             "[%d/%d] Lineage: %s done in %.1fs",
@@ -500,7 +366,6 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
         result = data.frame(cellID = cellIds, freqMatrix, check.names = FALSE)
 
         attr(result, "settings") = settings
-        if (!is.null(checkpointFile)) saveRDS(result, checkpointFile)
         result
     })
     names(confList) = groups

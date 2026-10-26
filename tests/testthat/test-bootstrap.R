@@ -88,9 +88,9 @@ test_that("bootstrapLineageConfidence records its settings", {
         bootstrapLineageConfidence(se, tree, nBoot = 3, nPerClass = 20,
             seed = 10)))
     settings = attr(conf$Grp, "settings")
-    expect_equal(settings[c("nBoot", "nPerClass", "classifier", "ntree",
-        "seed")], list(nBoot = 3, nPerClass = 20, classifier = "pcaLogistic",
-        ntree = 500, seed = 11))
+    expect_equal(settings[c("nBoot", "nPerClass", "classifier", "priors",
+        "ntree", "seed")], list(nBoot = 3, nPerClass = 20,
+        classifier = "pcaLogistic", priors = "balanced", ntree = 500, seed = 11))
     expect_setequal(settings$children, c("A", "B"))
     expect_true("fuzzyCellVersion" %in% names(settings))
 })
@@ -180,29 +180,6 @@ test_that("groups that cannot be bootstrapped are skipped with a message", {
         "only 1 cell type present \\('A'\\)")
 })
 
-test_that("checkpointSettingsDiff reports only real differences", {
-    stored = list(nBoot = 20, nPerClass = 50, classifier = "rf", ntree = 100,
-        seed = 5, children = c("A", "B"))
-    expect_length(fuzzyCell:::checkpointSettingsDiff(stored, stored), 0)
-    # integer vs numeric is not a difference; child order does not matter
-    same = modifyList(stored, list(nBoot = 20L, children = c("B", "A")))
-    expect_length(fuzzyCell:::checkpointSettingsDiff(stored, same), 0)
-    diffs = fuzzyCell:::checkpointSettingsDiff(stored,
-        modifyList(stored, list(nBoot = 100, classifier = "lda")))
-    expect_length(diffs, 2)
-    expect_match(diffs[1], "nBoot \\(checkpoint: 20, this call: 100\\)")
-    # ntree is ignored unless a random forest is involved
-    lda1 = modifyList(stored, list(classifier = "lda", ntree = 100))
-    lda2 = modifyList(lda1, list(ntree = 500))
-    expect_length(fuzzyCell:::checkpointSettingsDiff(lda1, lda2), 0)
-    # NULL seeds
-    expect_length(fuzzyCell:::checkpointSettingsDiff(
-        modifyList(stored, list(seed = NULL)),
-        modifyList(stored, list(seed = NULL))), 0)
-    expect_length(fuzzyCell:::checkpointSettingsDiff(stored,
-        modifyList(stored, list(seed = NULL))), 1)
-})
-
 test_that("all classifiers run", {
     d = makeCounts()
     for (cl in c("lda", "svm", "rf")) {
@@ -220,17 +197,6 @@ test_that("bootstrapLineageConfidence returns one table per group (full data)", 
         names(d$confList)))
     expect_true(all(c("cellID", "CD8+ T cells") %in%
         names(d$confList[["T cells"]])))
-})
-
-test_that("checkpointing round-trips (full data)", {
-    skip_unless_full()
-    skip_if(nzchar(Sys.getenv("DEVTOOLS_LOAD")), "package not installed")
-    d = fullTestData()
-    dir = tempfile()
-    conf = suppressMessages(suppressWarnings(
-        bootstrapLineageConfidence(d$spe, d$heartCellTypeTree, nBoot = 5,
-            seed = 1, checkpointDir = dir)))
-    expect_equal(loadCheckpointedConfList(d$heartCellTypeTree, dir), conf)
 })
 
 test_that("crossfitLineageProbabilities gives probabilities for every cell of each group", {
