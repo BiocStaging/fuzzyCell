@@ -5,7 +5,7 @@ test_that("clusterNiches labels every row with one of k niches", {
     set.seed(1)
     m = rbind(matrix(rnorm(60), 30, 2), matrix(rnorm(60, 5), 30, 2))
     rownames(m) = paste0("c", seq_len(nrow(m)))
-    niches = stBoot:::clusterNiches(m, k = 2)
+    niches = fuzzyCell:::clusterNiches(m, k = 2)
     expect_length(niches, 60)
     expect_setequal(unique(niches), c("niche1", "niche2"))
     expect_equal(names(niches), rownames(m))

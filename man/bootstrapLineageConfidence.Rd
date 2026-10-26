@@ -44,7 +44,7 @@ group is reproducible independently of the others.}
 
 \item{checkpointDir}{If given, each group's result is saved there as
 soon as it finishes, and re-running resumes from existing files. Each
-group then runs in a fresh \code{callr} subprocess, which requires stBoot to
+group then runs in a fresh \code{callr} subprocess, which requires fuzzyCell to
 be installed.}
 
 \item{skipGroups}{Names of groups to leave out of the result.}
@@ -81,7 +81,7 @@ cell's confidence score for that cell type (between 0 and 1, rows summing
 to 1 across the child columns).
 Each data frame also carries a \code{"settings"} attribute recording how it
 was computed (\code{nBoot}, \code{nPerClass}, \code{classifier}, \code{ntree}, the group's
-\code{seed}, its \code{children} and the \code{stBootVersion}), which is also saved in
+\code{seed}, its \code{children} and the \code{fuzzyCellVersion}), which is also saved in
 checkpoint files. When resuming from a checkpoint, a message reports
 the stored classifier and any settings that differ from the current call.
 }

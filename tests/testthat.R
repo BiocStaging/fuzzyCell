@@ -1,4 +1,4 @@
 library(testthat)
-library(stBoot)
+library(fuzzyCell)
 
-test_check("stBoot")
+test_check("fuzzyCell")

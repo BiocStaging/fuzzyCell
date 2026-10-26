@@ -9,7 +9,7 @@ test_that("getCellData adds coordinates from a SpatialExperiment", {
 test_that("generateComparisons returns all pair types", {
     data(heartCellTypeTree)
     confList = list("T cells" = NULL, "B lineage" = NULL)
-    comp = stBoot:::generateComparisons(heartCellTypeTree, confList)
+    comp = fuzzyCell:::generateComparisons(heartCellTypeTree, confList)
     expect_named(comp, c("groupGroup", "groupLeaf", "leafLeaf"))
     nLeaves = nrow(buildCellTypeMap(heartCellTypeTree)$cellMap)
     expect_equal(nrow(comp$leafLeaf), nLeaves^2)

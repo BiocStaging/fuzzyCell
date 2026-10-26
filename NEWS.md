@@ -1,4 +1,4 @@
-# stBoot 0.99.1
+# fuzzyCell 0.99.1
 
 * Co-localisation (`runColocalisationModels()`) is spicyR's cell-level test with the confidences as soft cell type
   weights (`spicyR::spicy(cellWeights =)`), and relative co-localisation is Statial's Kontextual test with the
@@ -13,7 +13,7 @@
 * The bootstrap resamples all cells' counts in one pass, grows a random forest on the workers, and accepts sparse
   counts.
 
-# stBoot 0.99.0
+# fuzzyCell 0.99.0
 
 * Initial package, prepared for Bioconductor submission.
 * Bootstrap classification confidence (`bootstrapLineageConfidence()`).

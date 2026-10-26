@@ -1,5 +1,5 @@
 ---
-title: "Confidence-weighted spatial analysis with stBoot"
+title: "Confidence-weighted spatial analysis with fuzzyCell"
 author:
   - name: Shreya Rao
     affiliation: The University of Sydney
@@ -16,7 +16,7 @@ knitr:
     message: false
     warning: false
 vignette: >
-  %\VignetteIndexEntry{Confidence-weighted spatial analysis with stBoot}
+  %\VignetteIndexEntry{Confidence-weighted spatial analysis with fuzzyCell}
   %\VignetteEngine{quarto::html}
   %\VignetteEncoding{UTF-8}
 ---
@@ -25,7 +25,7 @@ vignette: >
 
 Spatial single-cell technologies measure the expression of hundreds to thousands of genes in each cell while keeping its position in the tissue. A critical pre-processing step is cell type annotation, in which each cell is assigned a label. This step is error prone; transcripts diffuse out of their cell and are assigned to its neighbours, segmentation boundaries are imperfect, and each cell has few detected transcripts across a limited gene panel, so its expression profile is sparse and noisy. These problems matter most between closely related subtypes, whose profiles overlap to begin with. Despite this, most downstream analyses treat the labels as hard and known. Every cell counts as exactly one cell type, however uncertain its assignment, and this uncertainty carries into the spatial analyses built on the labels, such as cell type proportions, co-localisation and niche identification.
 
-*stBoot* estimates how confident each cell's label is, and carries that confidence through the analysis. For each group of closely related subtypes, it trains a classifier on the original labels and then repeatedly resamples every cell's transcript counts and re-classifies it. The fraction of resamples in which a cell is assigned to a subtype is its **confidence** in that subtype: a cell that keeps the same label under resampling is a confident one, and a cell whose label changes is not. These confidences are used as **soft cell type weights** (a cell contributes to several subtypes in proportion to its confidence, rather than to one), in:
+*fuzzyCell* estimates how confident each cell's label is, and carries that confidence through the analysis. For each group of closely related subtypes, it trains a classifier on the original labels and then repeatedly resamples every cell's transcript counts and re-classifies it. The fraction of resamples in which a cell is assigned to a subtype is its **confidence** in that subtype: a cell that keeps the same label under resampling is a confident one, and a cell whose label changes is not. These confidences are used as **soft cell type weights** (a cell contributes to several subtypes in proportion to its confidence, rather than to one), in:
 
 -   cell type proportions
 -   co-localisation of pairs of cell types
@@ -37,7 +37,7 @@ Every analysis can be run twice, once with the original hard labels (*unweighted
 
 The workflow is:
 
-1.  describe the cell type hierarchy with a *cell type tree*, so that stBoot knows which subtypes are easily confused
+1.  describe the cell type hierarchy with a *cell type tree*, so that fuzzyCell knows which subtypes are easily confused
 2.  bootstrap the classification of each group of related subtypes to get per-cell confidence scores
 3.  run a weighted and unweighted analysis (proportions, co-localisation, or niches) and compare
 
@@ -49,7 +49,7 @@ This vignette follows the workflow on a cellular rejection pre-transplant heart 
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
     install.packages("BiocManager")
 }
-BiocManager::install("stBoot")
+BiocManager::install("fuzzyCell")
 
 # remove later
 devtools::install()
@@ -57,10 +57,10 @@ devtools::install()
 
 # Example data: heart transplant biopsies
 
-The data are Xenium biopsies from heart transplant patients with cellular rejection (Amancherla et al., 2025), available as `SpatialDatasets::spe_Amancherla_2025()`. `loadAmancherla()` downloads them and prepares them for stBoot: it subsets to one image per patient. Here we use the biopsies taken before transplant (`timing = "pre"`). Each patient's outcome after transplant is stored in `resolution_broad`: the rejection either `"resolved"` or showed `"persistence"`.
+The data are Xenium biopsies from heart transplant patients with cellular rejection (Amancherla et al., 2025), available as `SpatialDatasets::spe_Amancherla_2025()`. `loadAmancherla()` downloads them and prepares them for fuzzyCell: it subsets to one image per patient. Here we use the biopsies taken before transplant (`timing = "pre"`). Each patient's outcome after transplant is stored in `resolution_broad`: the rejection either `"resolved"` or showed `"persistence"`.
 
 ```{r data}
-library(stBoot)
+library(fuzzyCell)
 library(SpatialExperiment)
 spe = loadAmancherla("pre")
 spe
@@ -71,11 +71,11 @@ table(imageOutcome$resolution_broad)
 
 ```
 
-Any `SummarizedExperiment` (such as a `SpatialExperiment`) can be used with stBoot as long as it has a `"counts"` assay and the cell metadata columns `cellID`, `imageID`, `cellType`, `x` and `y` in its `colData`. If your columns are named differently, the analysis functions take arguments (such as `cellType` and `imageID`) giving the column names.
+Any `SummarizedExperiment` (such as a `SpatialExperiment`) can be used with fuzzyCell as long as it has a `"counts"` assay and the cell metadata columns `cellID`, `imageID`, `cellType`, `x` and `y` in its `colData`. If your columns are named differently, the analysis functions take arguments (such as `cellType` and `imageID`) giving the column names.
 
 # The cell type tree
 
-Annotation confidence is calculated between closely related cell types, so stBoot requires a cell type hierarchy in the format given below:
+Annotation confidence is calculated between closely related cell types, so fuzzyCell requires a cell type hierarchy in the format given below:
 
 ```{r tree}
 tree = list(
@@ -102,7 +102,7 @@ tree = list(
 buildCellTypeMap(tree)$groupsWithChildren
 ```
 
-\`stBoot\` accepts cell type hierarchies in the form of a nested list. A group of subtypes that should be refined together is written `list(children = ...)`, for example the T cell subtypes above. Everything else is organisational nesting (lineages such as `"Immune"`) or a plain leaf cell type (such as `"NK"`). `stBoot` will only generate confidence scores for cells that have clearly defined leaf nodes. For instance, it will not generate confidence scores for `NK` or `Mast` cells in the hierarchy above, as they are leaf cell types without a group.
+\`fuzzyCell\` accepts cell type hierarchies in the form of a nested list. A group of subtypes that should be refined together is written `list(children = ...)`, for example the T cell subtypes above. Everything else is organisational nesting (lineages such as `"Immune"`) or a plain leaf cell type (such as `"NK"`). `fuzzyCell` will only generate confidence scores for cells that have clearly defined leaf nodes. For instance, it will not generate confidence scores for `NK` or `Mast` cells in the hierarchy above, as they are leaf cell types without a group.
 
 The same tree is also included in the package as `heartCellTypeTree`.
 
