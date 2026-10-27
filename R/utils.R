@@ -261,6 +261,13 @@ checkRadii = function(r, arg = "r") {
 }
 
 # checks that `seed` is NULL (no fixed seed) or a single number
+checkCores = function(cores, arg = "cores") {
+    if (!is.numeric(cores) || length(cores) != 1 || is.na(cores) || cores < 1 || cores != round(cores)) {
+        stop("`", arg, "` must be a single whole number of at least 1", call. = FALSE)
+    }
+    invisible(cores)
+}
+
 checkSeed = function(seed, arg = "seed") {
     if (!is.null(seed) && (!is.numeric(seed) || length(seed) != 1 || is.na(seed))) {
         stop("`", arg, "` must be NULL or a single number", call. = FALSE)

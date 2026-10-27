@@ -9,7 +9,7 @@ bootstrapClassify(
   labels,
   nBoot = 100,
   nPerClass = 50,
-  BPPARAM = BiocParallel::SerialParam(),
+  cores = 1,
   seed = NULL,
   classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"),
   ntree = 500,
@@ -29,11 +29,10 @@ row of \code{countMat}.}
 \item{nPerClass}{Minimum number of training cells per class; classes
 smaller than this are up-sampled with replacement.}
 
-\item{BPPARAM}{A \link[BiocParallel:BiocParallelParam-class]{BiocParallel::BiocParallelParam} object saying
-how to run the bootstrap resamples, for example
-\code{\link[BiocParallel:MulticoreParam]{BiocParallel::MulticoreParam()}}. The default runs serially. If \code{seed} is
-given it is set on \code{BPPARAM}, and the results are identical whichever
-backend and number of workers is used.}
+\item{cores}{Number of cores to run the bootstrap resamples on (forked
+with BiocParallel); the default runs serially. On Windows, where forking is
+not available, it always runs serially. If \code{seed} is given, the results are
+identical whatever the number of cores.}
 
 \item{seed}{Random seed for reproducibility, or \code{NULL}. Recommended for reproducibility.}
 

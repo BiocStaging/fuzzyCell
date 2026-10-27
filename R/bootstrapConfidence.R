@@ -122,11 +122,10 @@ predictClassifierClass = function(fit, newx, classifier = c("pcaLogistic", "logi
 #' @param nBoot Number of bootstrap resamples.
 #' @param nPerClass Minimum number of training cells per class; classes
 #'   smaller than this are up-sampled with replacement.
-#' @param BPPARAM A [BiocParallel::BiocParallelParam-class] object saying
-#'   how to run the bootstrap resamples, for example
-#'   [BiocParallel::MulticoreParam()]. The default runs serially. If `seed` is
-#'   given it is set on `BPPARAM`, and the results are identical whichever
-#'   backend and number of workers is used.
+#' @param cores Number of cores to run the bootstrap resamples on (forked
+#'   with BiocParallel); the default runs serially. On Windows, where forking is
+#'   not available, it always runs serially. If `seed` is given, the results are
+#'   identical whatever the number of cores.
 #' @param seed Random seed for reproducibility, or `NULL`. Recommended for reproducibility.
 #' @param classifier One of `"pcaLogistic"` (ridge multinomial logistic
 #'   regression, via glmnet, with the penalty chosen by cross-validation, on the
@@ -156,11 +155,12 @@ predictClassifierClass = function(fit, newx, classifier = c("pcaLogistic", "logi
 #' head(freq)
 #' }
 #' @export
-bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPARAM = BiocParallel::SerialParam(),
+bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, cores = 1,
                             seed = NULL, classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"), ntree = 500,
                             priors = c("balanced", "observed")) {
     classifier = match.arg(classifier)
     priors = match.arg(priors)
+    checkCores(cores)
     labels = as.character(labels)
     # the logistic fits find their genes by name, so unnamed genes are named by position
     if (is.null(colnames(countMat))) colnames(countMat) = paste0("gene", seq_len(ncol(countMat)))
@@ -214,6 +214,7 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
             "matrix of counts.", call. = FALSE)
     }
     keep = keep & !is.na(keep)
+    BPPARAM = if (cores > 1 && .Platform$OS.type != "windows") BiocParallel::MulticoreParam(cores) else BiocParallel::SerialParam()
     # the forest's own random streams, apart from those of the resamples below
     if (!is.null(seed)) BiocParallel::bpRNGseed(BPPARAM) = seed + 7919L
     fit = trainClassifier(scaledMat[balancedIdx, keep, drop = FALSE], labels[balancedIdx], classifier, ntree = ntree,
@@ -252,18 +253,18 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
 # of whatever has accumulated in this session (the spe object, prior lineages'
 # results) - that accumulated heap is what gets duplicated into every worker otherwise,
 # ballooning RSS on large lineages.
-bootstrapLineageInSubprocess = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, wd,
+bootstrapLineageInSubprocess = function(countMat, labels, nBoot, nPerClass, cores, seed, wd,
                                          classifier = "pcaLogistic", ntree = 500, priors = "balanced") {
     callr::r(
-        func = function(countMat, labels, nBoot, nPerClass, BPPARAM, seed, classifier, ntree, priors) {
+        func = function(countMat, labels, nBoot, nPerClass, cores, seed, classifier, ntree, priors) {
             fuzzyCell::bootstrapClassify(countMat, labels,
-                nBoot = nBoot, nPerClass = nPerClass, BPPARAM = BPPARAM,
+                nBoot = nBoot, nPerClass = nPerClass, cores = cores,
                 seed = seed, classifier = classifier, ntree = ntree, priors = priors
             )
         },
         args = list(
             countMat = countMat, labels = labels, nBoot = nBoot,
-            nPerClass = nPerClass, BPPARAM = BPPARAM, seed = seed,
+            nPerClass = nPerClass, cores = cores, seed = seed,
             classifier = classifier, ntree = ntree, priors = priors
         ),
         wd = wd,
@@ -309,10 +310,9 @@ checkSubprocessInstall = function() {
 #' @param cellTypeTree A cell type tree, see [cellTypeTree].
 #' @param skipGroups Names of groups to leave out of the result.
 #' @param subprocess If `TRUE`, each group is bootstrapped in a fresh R session
-#'   (via callr), which only holds that group's counts. With a forking backend
-#'   such as [BiocParallel::MulticoreParam()], every worker starts as a copy of
-#'   the session it is forked from, so this keeps the workers small on large
-#'   data. It requires the same version of fuzzyCell to be installed.
+#'   (via callr), which only holds that group's counts. With `cores` above 1,
+#'   every worker starts as a copy of the session it is forked from, so this
+#'   keeps the workers small on large data. It requires the same version of fuzzyCell to be installed.
 #' @param seed Random seed, or `NULL` for no fixed seed. Each group is
 #'   bootstrapped with `seed` plus its position in the list of groups, so every
 #'   group is reproducible independently of the others.
@@ -339,7 +339,7 @@ checkSubprocessInstall = function() {
 #' }
 #' @export
 bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass = 50,
-                                       BPPARAM = BiocParallel::SerialParam(), seed = 51773,
+                                       cores = 1, seed = 51773,
                                        skipGroups = character(0), subprocess = FALSE,
                                        classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"), ntree = 500,
                                        priors = c("balanced", "observed"),
@@ -350,6 +350,7 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
     if (!is.logical(subprocess) || length(subprocess) != 1 || is.na(subprocess)) {
         stop("`subprocess` must be TRUE or FALSE", call. = FALSE)
     }
+    checkCores(cores)
     if (subprocess) checkSubprocessInstall()
 
     checkSpe(spe)
@@ -406,13 +407,13 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
         countMat = denseCounts(assay(spe[, idx], assayName))
 
         freqMatrix = if (subprocess) {
-            bootstrapLineageInSubprocess(countMat, labels, nBoot, nPerClass, BPPARAM, groupSeed,
+            bootstrapLineageInSubprocess(countMat, labels, nBoot, nPerClass, cores, groupSeed,
                 wd = getwd(), classifier = classifier, ntree = ntree, priors = priors
             )
         } else {
             bootstrapClassify(countMat, labels,
                 nBoot = nBoot, nPerClass = nPerClass,
-                BPPARAM = BPPARAM, seed = groupSeed, classifier = classifier, ntree = ntree, priors = priors
+                cores = cores, seed = groupSeed, classifier = classifier, ntree = ntree, priors = priors
             )
         }
 

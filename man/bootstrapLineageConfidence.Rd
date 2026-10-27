@@ -9,7 +9,7 @@ bootstrapLineageConfidence(
   cellTypeTree,
   nBoot = 100,
   nPerClass = 50,
-  BPPARAM = BiocParallel::SerialParam(),
+  cores = 1,
   seed = 51773,
   skipGroups = character(0),
   subprocess = FALSE,
@@ -32,11 +32,10 @@ assay and per-cell cell type labels and unique cell IDs in \code{colData}.}
 \item{nPerClass}{Minimum number of training cells per class; classes
 smaller than this are up-sampled with replacement.}
 
-\item{BPPARAM}{A \link[BiocParallel:BiocParallelParam-class]{BiocParallel::BiocParallelParam} object saying
-how to run the bootstrap resamples, for example
-\code{\link[BiocParallel:MulticoreParam]{BiocParallel::MulticoreParam()}}. The default runs serially. If \code{seed} is
-given it is set on \code{BPPARAM}, and the results are identical whichever
-backend and number of workers is used.}
+\item{cores}{Number of cores to run the bootstrap resamples on (forked
+with BiocParallel); the default runs serially. On Windows, where forking is
+not available, it always runs serially. If \code{seed} is given, the results are
+identical whatever the number of cores.}
 
 \item{seed}{Random seed, or \code{NULL} for no fixed seed. Each group is
 bootstrapped with \code{seed} plus its position in the list of groups, so every
@@ -45,10 +44,9 @@ group is reproducible independently of the others.}
 \item{skipGroups}{Names of groups to leave out of the result.}
 
 \item{subprocess}{If \code{TRUE}, each group is bootstrapped in a fresh R session
-(via callr), which only holds that group's counts. With a forking backend
-such as \code{\link[BiocParallel:MulticoreParam]{BiocParallel::MulticoreParam()}}, every worker starts as a copy of
-the session it is forked from, so this keeps the workers small on large
-data. It requires the same version of fuzzyCell to be installed.}
+(via callr), which only holds that group's counts. With \code{cores} above 1,
+every worker starts as a copy of the session it is forked from, so this
+keeps the workers small on large data. It requires the same version of fuzzyCell to be installed.}
 
 \item{classifier}{One of \code{"pcaLogistic"} (ridge multinomial logistic
 regression, via glmnet, with the penalty chosen by cross-validation, on the

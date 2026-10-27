@@ -94,8 +94,8 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #'   [bootstrapClassify()].
 #' @param priors `"balanced"` (equal priors, as the classifier is trained) or
 #'   `"observed"` (each class weighted by its share of the group's cells).
-#' @param BPPARAM A [BiocParallel::BiocParallelParam-class] object; the folds
-#'   are fitted in parallel on its workers.
+#' @param cores Number of cores to fit the folds on in parallel, as in
+#'   [bootstrapClassify()].
 #'
 #' @return A confidence list in the format of [bootstrapLineageConfidence()],
 #'   with probabilities in place of bootstrap confidences.
@@ -110,11 +110,13 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #' @export
 crossfitLineageProbabilities = function(spe, cellTypeTree, nFolds = 5, nPerClass = 50, seed = 51773,
                                         classifier = c("pcaLogistic", "logistic", "rf", "lda"), ntree = 500,
-                                        priors = c("balanced", "observed"), BPPARAM = BiocParallel::SerialParam(),
+                                        priors = c("balanced", "observed"), cores = 1,
                                         skipGroups = character(0), cellType = "cellType",
                                         cellID = "cellID", assayName = "counts") {
     classifier = match.arg(classifier)
     priors = match.arg(priors)
+    checkCores(cores)
+    BPPARAM = if (cores > 1 && .Platform$OS.type != "windows") BiocParallel::MulticoreParam(cores) else BiocParallel::SerialParam()
     checkSpe(spe)
     checkColumn(spe, cellType, "cellType")
     checkColumn(spe, cellID, "cellID")

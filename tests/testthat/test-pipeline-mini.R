@@ -1,7 +1,6 @@
 ## End-to-end run of the spatial functions on a small hand-made dataset, so
 ## they are exercised even when the full-data tests are skipped.
 d = miniPipelineData()
-serial = BiocParallel::SerialParam()
 quiet = function(x) suppressWarnings(suppressMessages(x))
 
 test_that("runColocalisationModels runs end to end", {
@@ -35,14 +34,16 @@ test_that("proportion pipelines run end to end", {
     expect_true(all(rel$proportions$proportionUnweighted <= 1, na.rm = TRUE))
 })
 
-test_that("results do not depend on the BiocParallel backend or the number of threads", {
+test_that("results do not depend on the number of cores", {
     skip_on_os("windows")
-    multi = BiocParallel::MulticoreParam(2)
     expect_equal(
         quiet(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 3, seed = 1,
-            BPPARAM = serial)),
+            cores = 1)),
         quiet(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 3, seed = 1,
-            BPPARAM = multi)))
+            cores = 2)))
+    expect_equal(
+        quiet(crossfitLineageProbabilities(d$spe, d$tree, nFolds = 3, seed = 1, cores = 1)),
+        quiet(crossfitLineageProbabilities(d$spe, d$tree, nFolds = 3, seed = 1, cores = 2)))
     expect_equal(
         quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome", cores = 1)),
         quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome", cores = 2)))

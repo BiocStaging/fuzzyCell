@@ -13,7 +13,7 @@ crossfitLineageProbabilities(
   classifier = c("pcaLogistic", "logistic", "rf", "lda"),
   ntree = 500,
   priors = c("balanced", "observed"),
-  BPPARAM = BiocParallel::SerialParam(),
+  cores = 1,
   skipGroups = character(0),
   cellType = "cellType",
   cellID = "cellID",
@@ -45,8 +45,8 @@ group is reproducible independently of the others.}
 \item{priors}{\code{"balanced"} (equal priors, as the classifier is trained) or
 \code{"observed"} (each class weighted by its share of the group's cells).}
 
-\item{BPPARAM}{A \link[BiocParallel:BiocParallelParam-class]{BiocParallel::BiocParallelParam} object; the folds
-are fitted in parallel on its workers.}
+\item{cores}{Number of cores to fit the folds on in parallel, as in
+\code{\link[=bootstrapClassify]{bootstrapClassify()}}.}
 
 \item{skipGroups}{Names of groups to leave out of the result.}
 
