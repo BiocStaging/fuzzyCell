@@ -63,6 +63,7 @@ test_that("parallel workers run BLAS on one thread, and the session's setting is
     before = RhpcBLASctl::blas_get_num_procs()
     on.exit(RhpcBLASctl::blas_set_num_threads(before))
     RhpcBLASctl::blas_set_num_threads(2L)
+    skip_if(RhpcBLASctl::blas_get_num_procs() != 2L, "this BLAS does not have a thread count to set")
     inWorkers = unlist(parLapply(1:4, function(i) RhpcBLASctl::blas_get_num_procs(), parallelParam(2)))
     expect_true(all(inWorkers == 1L))
     expect_equal(RhpcBLASctl::blas_get_num_procs(), 2L)

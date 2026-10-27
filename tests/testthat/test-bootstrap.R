@@ -339,6 +339,7 @@ test_that("the classifiers run BLAS on one thread and restore the session's sett
     before = RhpcBLASctl::blas_get_num_procs()
     on.exit(RhpcBLASctl::blas_set_num_threads(before))
     RhpcBLASctl::blas_set_num_threads(2L)
+    skip_if(RhpcBLASctl::blas_get_num_procs() != 2L, "this BLAS does not have a thread count to set")
     d = makeCounts()
     seen = NULL
     resample = resampleHits
