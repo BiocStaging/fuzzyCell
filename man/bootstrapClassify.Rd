@@ -13,7 +13,8 @@ bootstrapClassify(
   seed = NULL,
   classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"),
   ntree = 500,
-  priors = c("balanced", "observed")
+  priors = c("balanced", "observed"),
+  correctedCounts = FALSE
 )
 }
 \arguments{
@@ -49,6 +50,13 @@ e1071).}
 every class the same prior. \code{"balanced"} keeps those equal priors;
 \code{"observed"} weights each class by its share of the cells, so a resample
 is assigned to its most probable class given how common the classes are.}
+
+\item{correctedCounts}{\code{FALSE} (the default) requires whole-number counts.
+\code{TRUE} also accepts counts that are not whole numbers, such as counts
+corrected for ambient RNA, and resamples them as they are. They must still
+be on the scale of molecule counts: a cell's resample draws as many
+transcripts as its total (rounded), so normalised or log-transformed values
+would give the wrong amount of resampling noise.}
 }
 \value{
 A numeric matrix with one row per cell (in the order of

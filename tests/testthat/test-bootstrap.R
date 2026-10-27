@@ -278,12 +278,30 @@ test_that("an unnamed count matrix gives the same confidences as a named one", {
     expect_equal(p2, p1)
 })
 
-test_that("whole-number counts with floating-point error are resampled as their rounded values", {
-    x = rbind(c(6 * 0.1 / 0.1, 1))
+test_that("resampling draws each gene in proportion to its count, whole or not", {
+    # 6 * 0.1 / 0.1 is 6.000000000000001
+    x = rbind(c(6 * 0.1 / 0.1, 1), c(2.5, 1.5), c(0, 0))
     set.seed(1)
-    draws = replicate(500, resampleCounts(resampleLayout(x))[1, 2])
-    expect_gt(mean(draws), 0)
-    expect_equal(sum(resampleCounts(resampleLayout(x))), 7)
+    draws = replicate(4000, resampleCounts(resampleLayout(x)))
+    expect_equal(mean(draws[1, 2, ]) / 7, 1 / 7, tolerance = 0.1)
+    expect_equal(rowMeans(draws[2, , ]), c(2.5, 1.5), tolerance = 0.05)
+    expect_true(all(apply(draws, 3, rowSums) == c(7, 4, 0)))
+})
+
+test_that("non-integer counts need correctedCounts = TRUE", {
+    d = makeCounts()
+    corrected = d$counts * 0.9
+    expect_error(bootstrapClassify(corrected, d$labels, nBoot = 2), "correctedCounts = TRUE")
+    freq = suppressMessages(bootstrapClassify(corrected, d$labels, nBoot = 5, seed = 1, correctedCounts = TRUE))
+    expect_equal(unname(rowSums(freq)), rep(1, nrow(freq)))
+    negative = corrected
+    negative[1, 1] = -0.5
+    expect_error(bootstrapClassify(negative, d$labels, nBoot = 2, correctedCounts = TRUE), "non-negative")
+    expect_error(bootstrapClassify(d$counts, d$labels, nBoot = 2, correctedCounts = NA), "TRUE or FALSE")
+    # whole numbers give the same result either way
+    f1 = suppressMessages(bootstrapClassify(d$counts, d$labels, nBoot = 5, seed = 1))
+    f2 = suppressMessages(bootstrapClassify(d$counts, d$labels, nBoot = 5, seed = 1, correctedCounts = TRUE))
+    expect_equal(f2, f1)
 })
 
 test_that("resampling in blocks of cells gives the same counts", {

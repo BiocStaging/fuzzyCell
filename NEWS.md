@@ -13,7 +13,12 @@
 * The bootstrap resamples all cells' counts in one pass, grows a random forest on the workers, and accepts sparse
   counts.
 * The bootstrap resamples the cells in blocks of about 4 million transcripts, so its memory no longer grows with the
-  lineage's total count (the counts drawn are unchanged), and rounds counts stored with floating-point error.
+  lineage's total count. Each transcript is drawn from gene j with probability count_j / total using the counts as
+  given, so whole numbers stored with floating-point error are resampled correctly (whole-number counts give the
+  same draws as before).
+* `correctedCounts = TRUE` in `bootstrapClassify()` and `bootstrapLineageConfidence()` accepts counts that are not
+  whole numbers, such as counts corrected for ambient RNA, and resamples them as they are; they must still be on
+  the scale of molecule counts. By default counts must be whole numbers, as before.
 * `classifier = "pcaLogistic"` fits the genes themselves when fewer than three vary, and the logistic classifiers
   accept a count matrix without gene names.
 * `crossfitLineageProbabilities()` stratifies its folds by cell type, so every fold's classifier sees every child

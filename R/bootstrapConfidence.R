@@ -38,30 +38,36 @@ trainClassifier = function(x, y, classifier = c("pcaLogistic", "logistic", "rf",
     )
 }
 
-# Multinomial resampling of every cell's counts at its own total, in one pass:
-# each of a cell's transcripts is drawn with replacement from its observed
-# transcripts. `layout` is from resampleLayout(). The cells are resampled in
-# blocks of about `blockSize` transcripts, which bounds the memory a resample
-# needs; the draws, and so the counts, do not depend on the blocks.
+# Multinomial resampling of every cell's counts: a cell's resample draws as many
+# transcripts as its total (rounded), each from gene j with probability count_j /
+# total, the counts taken as they are (whole or not). `layout` is from
+# resampleLayout(). The cells are resampled in blocks of about `blockSize`
+# transcripts, which bounds the memory a resample needs; the draws, and so the
+# counts, do not depend on the blocks.
 resampleLayout = function(countMat, blockSize = 2^22) {
-    # whole numbers stored with floating-point error would shift the transcript boundaries
-    countMat = round(countMat)
     nz = which(countMat > 0, arr.ind = TRUE)
     nz = nz[order(nz[, 1], nz[, 2]), , drop = FALSE]
-    n = countMat[nz]
-    totals = as.numeric(rowSums(countMat))
-    list(nz = nz, ends = cumsum(n), start = c(0, cumsum(totals))[seq_len(nrow(countMat))],
-        totals = totals, blocks = split(seq_along(totals), cumsum(totals) %/% blockSize),
+    ends = cumsum(countMat[nz])
+    # each cell's run of nonzero entries, and its stretch of the cumulative counts
+    last = cumsum(tabulate(nz[, 1], nrow(countMat)))
+    first = c(1L, last[-length(last)] + 1L)
+    start = c(0, ends)[first]
+    totals = c(0, ends)[last + 1] - start
+    draws = round(totals)
+    list(nz = nz, ends = ends, first = first, last = last, start = start, totals = totals, draws = draws,
+        blocks = split(seq_along(draws), cumsum(draws) %/% blockSize),
         dim = dim(countMat), dimnames = dimnames(countMat))
 }
 resampleCounts = function(layout) {
     hits = integer(nrow(layout$nz))
     for (cells in layout$blocks) {
-        cell = rep.int(cells, layout$totals[cells])
+        cell = rep.int(cells, layout$draws[cells])
         if (length(cell) == 0) next
-        # a uniform position among the cell's transcripts, then the gene it falls in
-        pos = layout$start[cell] + ceiling(stats::runif(length(cell)) * layout$totals[cell])
-        entry = findInterval(pos - 1, layout$ends) + 1
+        # a uniform position along the cell's counts, then the gene it falls in (kept within the cell's own
+        # genes against rounding at the ends)
+        pos = layout$start[cell] + stats::runif(length(cell)) * layout$totals[cell]
+        entry = findInterval(pos, layout$ends) + 1
+        entry = pmin(pmax(entry, layout$first[cell]), layout$last[cell])
         # a block's cells own a contiguous run of the nonzero entries
         lo = min(entry)
         hits[lo:max(entry)] = tabulate(entry - lo + 1L, max(entry) - lo + 1L)
@@ -138,6 +144,12 @@ predictClassifierClass = function(fit, newx, classifier = c("pcaLogistic", "logi
 #'   every class the same prior. `"balanced"` keeps those equal priors;
 #'   `"observed"` weights each class by its share of the cells, so a resample
 #'   is assigned to its most probable class given how common the classes are.
+#' @param correctedCounts `FALSE` (the default) requires whole-number counts.
+#'   `TRUE` also accepts counts that are not whole numbers, such as counts
+#'   corrected for ambient RNA, and resamples them as they are. They must still
+#'   be on the scale of molecule counts: a cell's resample draws as many
+#'   transcripts as its total (rounded), so normalised or log-transformed values
+#'   would give the wrong amount of resampling noise.
 #'
 #' @return A numeric matrix with one row per cell (in the order of
 #'   `countMat`) and one column per class in `labels`. Entry `[i, k]` is the
@@ -157,11 +169,14 @@ predictClassifierClass = function(fit, newx, classifier = c("pcaLogistic", "logi
 #' @export
 bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, cores = 1,
                             seed = NULL, classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"), ntree = 500,
-                            priors = c("balanced", "observed")) {
+                            priors = c("balanced", "observed"), correctedCounts = FALSE) {
     classifier = match.arg(classifier)
     priors = match.arg(priors)
     checkCores(cores)
     labels = as.character(labels)
+    if (!is.logical(correctedCounts) || length(correctedCounts) != 1 || is.na(correctedCounts)) {
+        stop("`correctedCounts` must be TRUE or FALSE", call. = FALSE)
+    }
     # the logistic fits find their genes by name, so unnamed genes are named by position
     if (is.null(colnames(countMat))) colnames(countMat) = paste0("gene", seq_len(ncol(countMat)))
 
@@ -171,14 +186,18 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, core
             call. = FALSE)
     }
     # the resampling treats each cell's total as a number of transcripts, so
-    # normalised or log-transformed values would give meaningless (and
-    # silently truncated) totals. a small tolerance allows whole numbers that
-    # are stored as doubles with floating-point error.
-    if (anyNA(countMat) || any(countMat < 0) ||
-        any(abs(countMat - round(countMat)) > 1e-6)) {
+    # normalised or log-transformed values would give meaningless totals.
+    # counts that are not whole numbers need correctedCounts = TRUE; a small
+    # tolerance allows whole numbers stored as doubles with floating-point error.
+    if (correctedCounts && (anyNA(countMat) || any(countMat < 0))) {
+        stop("countMat must contain non-negative counts, with no missing values", call. = FALSE)
+    }
+    if (!correctedCounts && (anyNA(countMat) || any(countMat < 0) ||
+        any(abs(countMat - round(countMat)) > 1e-6))) {
         stop("countMat must contain raw non-negative integer counts, with no ",
-            "missing values. Did you pass normalised or log-transformed data?",
-            call. = FALSE)
+            "missing values. Did you pass normalised or log-transformed data? ",
+            "Counts corrected for ambient RNA, which need not be whole numbers, ",
+            "are accepted with correctedCounts = TRUE.", call. = FALSE)
     }
 
     # a class needs at least 2 cells: with one, the classifier has no
@@ -254,18 +273,22 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, core
 # results) - that accumulated heap is what gets duplicated into every worker otherwise,
 # ballooning RSS on large lineages.
 bootstrapLineageInSubprocess = function(countMat, labels, nBoot, nPerClass, cores, seed, wd,
-                                         classifier = "pcaLogistic", ntree = 500, priors = "balanced") {
+                                         classifier = "pcaLogistic", ntree = 500, priors = "balanced",
+                                         correctedCounts = FALSE) {
     callr::r(
-        func = function(countMat, labels, nBoot, nPerClass, cores, seed, classifier, ntree, priors) {
+        func = function(countMat, labels, nBoot, nPerClass, cores, seed, classifier, ntree, priors,
+                        correctedCounts) {
             fuzzyCell::bootstrapClassify(countMat, labels,
                 nBoot = nBoot, nPerClass = nPerClass, cores = cores,
-                seed = seed, classifier = classifier, ntree = ntree, priors = priors
+                seed = seed, classifier = classifier, ntree = ntree, priors = priors,
+                correctedCounts = correctedCounts
             )
         },
         args = list(
             countMat = countMat, labels = labels, nBoot = nBoot,
             nPerClass = nPerClass, cores = cores, seed = seed,
-            classifier = classifier, ntree = ntree, priors = priors
+            classifier = classifier, ntree = ntree, priors = priors,
+            correctedCounts = correctedCounts
         ),
         wd = wd,
         stdout = "", stderr = "" # inherit this session's streams so progress bars still show live
@@ -325,8 +348,9 @@ checkSubprocessInstall = function() {
 #'   cell's confidence score for that cell type (between 0 and 1, rows summing
 #'   to 1 across the child columns).
 #'   Each data frame also carries a `"settings"` attribute recording how it
-#'   was computed (`nBoot`, `nPerClass`, `classifier`, `priors`, `ntree`, the
-#'   group's `seed`, its `children` and the `fuzzyCellVersion`).
+#'   was computed (`nBoot`, `nPerClass`, `classifier`, `priors`,
+#'   `correctedCounts`, `ntree`, the group's `seed`, its `children` and the
+#'   `fuzzyCellVersion`).
 #'
 #' @examples
 #' \donttest{
@@ -342,7 +366,7 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
                                        cores = 1, seed = 51773,
                                        skipGroups = character(0), subprocess = FALSE,
                                        classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"), ntree = 500,
-                                       priors = c("balanced", "observed"),
+                                       priors = c("balanced", "observed"), correctedCounts = FALSE,
                                        cellType = "cellType", cellID = "cellID",
                                        assayName = "counts") {
     classifier = match.arg(classifier)
@@ -393,6 +417,7 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
         # how this group is bootstrapped, recorded with the result
         settings = list(
             nBoot = nBoot, nPerClass = nPerClass, classifier = classifier, priors = priors,
+            correctedCounts = correctedCounts,
             ntree = ntree, seed = groupSeed, children = unique(labels),
             fuzzyCellVersion = tryCatch(as.character(utils::packageVersion("fuzzyCell")),
                 error = function(e) NA_character_)
@@ -408,12 +433,14 @@ bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass 
 
         freqMatrix = if (subprocess) {
             bootstrapLineageInSubprocess(countMat, labels, nBoot, nPerClass, cores, groupSeed,
-                wd = getwd(), classifier = classifier, ntree = ntree, priors = priors
+                wd = getwd(), classifier = classifier, ntree = ntree, priors = priors,
+                correctedCounts = correctedCounts
             )
         } else {
             bootstrapClassify(countMat, labels,
                 nBoot = nBoot, nPerClass = nPerClass,
-                cores = cores, seed = groupSeed, classifier = classifier, ntree = ntree, priors = priors
+                cores = cores, seed = groupSeed, classifier = classifier, ntree = ntree, priors = priors,
+                correctedCounts = correctedCounts
             )
         }
 

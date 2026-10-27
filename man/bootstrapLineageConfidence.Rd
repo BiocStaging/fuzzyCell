@@ -16,6 +16,7 @@ bootstrapLineageConfidence(
   classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"),
   ntree = 500,
   priors = c("balanced", "observed"),
+  correctedCounts = FALSE,
   cellType = "cellType",
   cellID = "cellID",
   assayName = "counts"
@@ -62,6 +63,13 @@ every class the same prior. \code{"balanced"} keeps those equal priors;
 \code{"observed"} weights each class by its share of the cells, so a resample
 is assigned to its most probable class given how common the classes are.}
 
+\item{correctedCounts}{\code{FALSE} (the default) requires whole-number counts.
+\code{TRUE} also accepts counts that are not whole numbers, such as counts
+corrected for ambient RNA, and resamples them as they are. They must still
+be on the scale of molecule counts: a cell's resample draws as many
+transcripts as its total (rounded), so normalised or log-transformed values
+would give the wrong amount of resampling noise.}
+
 \item{cellType}{Name of the \code{colData(spe)} column holding each cell's cell
 type label.}
 
@@ -79,8 +87,9 @@ column, and one column per child cell type of the group holding the
 cell's confidence score for that cell type (between 0 and 1, rows summing
 to 1 across the child columns).
 Each data frame also carries a \code{"settings"} attribute recording how it
-was computed (\code{nBoot}, \code{nPerClass}, \code{classifier}, \code{priors}, \code{ntree}, the
-group's \code{seed}, its \code{children} and the \code{fuzzyCellVersion}).
+was computed (\code{nBoot}, \code{nPerClass}, \code{classifier}, \code{priors},
+\code{correctedCounts}, \code{ntree}, the group's \code{seed}, its \code{children} and the
+\code{fuzzyCellVersion}).
 }
 \description{
 For each group in \code{cellTypeTree} that has children (see \link{cellTypeTree}),
