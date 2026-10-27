@@ -10,9 +10,6 @@
   (`classifier = "pcaLogistic"`, glmnet and irlba); `"logistic"` fits it on all genes.
 * `priors = "observed"` weights each class by its share of the group's cells instead of equally.
 * `crossfitLineageProbabilities()`: cross-fitted class probabilities, an alternative to the bootstrap.
-* Checkpointing is removed: `bootstrapLineageConfidence()` no longer takes `checkpointDir`, and
-  `loadCheckpointedConfList()` is gone. Running each group in a fresh R session, which keeps forked workers small,
-  no longer needs checkpointing: it is the new argument `subprocess = TRUE`.
 * The bootstrap resamples all cells' counts in one pass, grows a random forest on the workers, and accepts sparse
   counts.
 * The bootstrap resamples the cells in blocks of about 4 million transcripts, so its memory no longer grows with the
