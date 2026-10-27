@@ -8,7 +8,7 @@ transcript counts and re-classifying it), and uses the confidences as **soft
 cell type weights** in downstream spatial analyses:
 
 - cell type proportions, among all cells and relative to the parent group;
-- co-localisation of pairs of cell types, with spicyR's test, and relative
+- co-localisation of pairs of cell types, with spicyR's L-function, and relative
   co-localisation with Statial's Kontextual test (via spicyR);
 - niche identification, from lisaClust's local indicators of spatial
   association.

@@ -81,7 +81,7 @@ test_that("runColocalisationModels returns tests, per-image effects and the spic
     expect_named(res, c("weighted", "unweighted", "modelWeighted",
         "modelUnweighted", "relativeWeighted", "relativeUnweighted",
         "modelRelativeWeighted", "modelRelativeUnweighted", "spicy"))
-    expect_true(all(c("from", "to", "estimate", "se", "p.value", "p.adj", "side") %in% names(res$modelWeighted)))
+    expect_true(all(c("from", "to", "estimate", "se", "statistic", "p.value", "p.adj") %in% names(res$modelWeighted)))
     expect_true(all(c("from", "to", "parent", "estimate", "p.value") %in% names(res$modelRelativeWeighted)))
     # no label is paired with itself or with a group that contains it
     pairs = paste(res$modelWeighted$from, res$modelWeighted$to)
@@ -97,15 +97,31 @@ test_that("confidence 1 in the original labels gives the unweighted results", {
     expect_equal(res$modelRelativeWeighted, res$modelRelativeUnweighted)
 })
 
-test_that("the unweighted test is spicyR's test of the cell types", {
+test_that("each pair is tested by a linear model of its per-image co-localisation on the outcome", {
+    res = quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome"))
+    outcome = unique(as.data.frame(SummarizedExperiment::colData(d$spe))[, c("imageID", "outcome")])
+    for (v in c("unweighted", "weighted")) {
+        model = res[[paste0("model", toupper(substring(v, 1, 1)), substring(v, 2))]]
+        for (k in c("A B", "A C", "C A")) {
+            pair = strsplit(k, " ")[[1]]
+            perImage = res[[v]][res[[v]]$from == pair[1] & res[[v]]$to == pair[2], ]
+            dat = merge(perImage, outcome, by = "imageID")
+            co = summary(lm(colocalisation ~ outcome, data = dat))$coefficients
+            m = model[model$from == pair[1] & model$to == pair[2], ]
+            expect_equal(m$estimate, unname(co[2, "Estimate"]), info = paste(v, k))
+            expect_equal(m$statistic, unname(co[2, "t value"]), info = paste(v, k))
+            expect_equal(m$p.value, unname(co[2, "Pr(>|t|)"]), info = paste(v, k))
+        }
+    }
+})
+
+test_that("the co-localisation is spicyR's L-function of the image, on the square around its cells", {
     res = quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome"))
     cells = getCellData(d$spe)
-    direct = quiet(spicyR::spicy(cells, condition = "outcome", r = 50, from = "A", to = c("B", "C")))
-    tab = direct$cellResults
-    m = res$modelUnweighted[res$modelUnweighted$from == "A" & res$modelUnweighted$to %in% c("B", "C"), ]
-    m = m[match(tab$to, m$to), ]
-    expect_equal(m$estimate, tab$excess_difference)
-    expect_equal(m$p.value, tab$p_value)
+    w = confidenceWeights(d$spe, d$tree, d$conf, weighted = FALSE)
+    direct = spicyR::getPairwise(cells, r = 50, from = "A", to = "B", cellWeights = w, window = "square")
+    perImage = res$unweighted[res$unweighted$from == "A" & res$unweighted$to == "B", ]
+    expect_equal(perImage$colocalisation[match(rownames(direct), perImage$imageID)], unname(direct[, 1]))
 })
 
 ## ---- other arguments and column names -----------------------------------------

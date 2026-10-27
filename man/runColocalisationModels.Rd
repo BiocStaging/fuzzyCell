@@ -11,7 +11,6 @@ runColocalisationModels(
   outcomeCol,
   r = 50,
   subject = NULL,
-  effect = c("allocation", "count"),
   cores = 1,
   parentOverrides = character(0),
   autoOverrideParents = TRUE,
@@ -38,11 +37,8 @@ outcome. It must have exactly two levels and a single value per image.}
 coordinates; a single positive number.}
 
 \item{subject}{Name of the \code{colData(spe)} column identifying the subject (for
-example the patient) each image comes from. Images of one subject are
-combined, and subjects are the units of the test. With \code{NULL} every image is
-its own subject.}
-
-\item{effect}{\code{"allocation"} or \code{"count"}, see Details.}
+example the patient) each image comes from. With \code{NULL} every image is its
+own subject.}
 
 \item{cores}{Number of threads.}
 
@@ -68,7 +64,8 @@ A list with the tests \code{modelWeighted}, \code{modelUnweighted},
 \code{modelRelativeWeighted} and \code{modelRelativeUnweighted} (one row per pair:
 \code{estimate}, the difference for the second level of the outcome compared with
 the first, its \code{se}, \code{statistic}, \code{p.value} and BH-adjusted \code{p.adj}, and for
-co-localisation the \code{side}, \code{"attract"} or \code{"avoid"}), the per-image effects
+relative co-localisation the \code{parent} and \code{side}, \code{"attract"} or \code{"avoid"}),
+the per-image values
 \code{weighted}, \code{unweighted}, \code{relativeWeighted} and \code{relativeUnweighted}
 (columns \code{imageID}, \code{from}, \code{to}, \code{colocalisation}, and \code{parent} for the
 relative version), and the spicyR results themselves (\code{spicy}, a list of
@@ -79,26 +76,26 @@ spicyR's plotting functions.
 Tests, for every pair of leaf cell types and groups, whether the
 co-localisation of the two differs between the two conditions of an outcome,
 once with the original labels and once with the bootstrap confidences as soft
-cell type weights. The tests are those of spicyR (\code{spicyR::spicy()}), and the
+cell type weights. The co-localisation of each image is the cross-type
+L-function, computed by spicyR (\code{spicyR::spicy(method = "image")}), and
 relative co-localisation is Statial's Kontextual test
 (\code{spicyR::kontextualEngine()}).
 }
 \details{
-Co-localisation of a pair \code{from} -> \code{to} is, by default, the extra fraction of
-\code{to} cells with a \code{from} cell within radius \code{r}, beyond the \code{to} labels being a
-random choice among the cells that are not \code{from} cells (\code{effect = "allocation"}); \code{effect = "count"} gives the extra number of \code{from} cells within
-\code{r} of each \code{to} cell. Images are combined within subjects and the conditions
-compared by spicyR's frailty model with a cluster-robust variance, with
-subjects as the units.
+Co-localisation of a pair \code{from} -> \code{to} in an image is the cross-type
+L-function: how strongly the \code{from} cells are attracted to (positive values)
+or avoid (negative values) the \code{to} cells within radius \code{r}, with 0 meaning no
+attraction or repulsion. The area of an image is that of the square around its
+cells, and cells near the border are edge corrected. Each pair is then tested
+by a linear model of its per-image values on the outcome (the images are the
+units); if some subjects have several images, spicyR fits a mixed model with
+the subject as a random effect instead.
 
 With weights (see \code{\link[=confidenceWeights]{confidenceWeights()}}), a cell of a bootstrapped group
-belongs to each subtype of the group with its bootstrap confidence. A \code{to} cell
-counts with its weight, and its chance of having a \code{from} neighbour is computed
-as if the labels of its neighbours were drawn from their confidences (for the
-count, it is the summed \code{from} confidence of its neighbours). Under the null
-hypothesis the \code{to} weights are shuffled over the cells, which gives the
-expected value and variance of each image's statistic. With the original labels
-(weights of 0 and 1) this is spicyR's own test.
+belongs to each subtype of the group with its bootstrap confidence: each cell
+contributes to a label in proportion to its weight, and the density of a label
+is its summed weight per unit area. With the original labels (weights of 0
+and 1) this is the unweighted L-function.
 
 Relative co-localisation compares the co-localisation of \code{from} with \code{to} to
 that of \code{from} with a parent population of \code{to}, so that attraction that only
