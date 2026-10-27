@@ -101,6 +101,16 @@ test_that("plotWeightedSpatialPair has a separate legend for each cell type", {
 })
 
 ## ---- marker plots read the counts from an assay of spe ------------------------
+test_that("the marker plots give the same picture for sparse and dense counts", {
+    sparse = spe
+    SummarizedExperiment::assay(sparse, "counts") = as(SummarizedExperiment::assay(spe, "counts"), "CsparseMatrix")
+    layerData = function(p) lapply(ggplot2::ggplot_build(p)$data, function(l) l[, setdiff(names(l), "group")])
+    expect_equal(layerData(plotOneMarkerSpatial(sparse, "img1", "G", "g1", cellTypeTree = tree2)),
+        layerData(plotOneMarkerSpatial(spe, "img1", "G", "g1", cellTypeTree = tree2)))
+    expect_equal(layerData(plotTwoMarkerSpatial(sparse, "img1", "G", "g1", "purple", "H", "g4", "green", cellTypeTree = tree2)),
+        layerData(plotTwoMarkerSpatial(spe, "img1", "G", "g1", "purple", "H", "g4", "green", cellTypeTree = tree2)))
+})
+
 test_that("the marker plots take their counts from the assay of spe", {
     # a second assay with different counts is used when asked for
     other = spe

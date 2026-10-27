@@ -328,7 +328,7 @@ plotOneMarkerSpatial = function(spe, imageID, group, marker, colour = "purple",
     countMat = SummarizedExperiment::assay(spe, assayName)
     checkGene(countMat, marker, "marker", assayName)
 
-    librarySize = colSums(countMat)
+    librarySize = Matrix::colSums(countMat) # works for dense and sparse counts
     cells$norm = countMat[marker, ] / librarySize
 
     imgCells = cells |> dplyr::filter(imageID == !!imageID)
@@ -381,7 +381,7 @@ plotTwoMarkerSpatial = function(spe, imageID,
     countMat = SummarizedExperiment::assay(spe, assayName)
     checkGene(countMat, markerA, "markerA", assayName)
     checkGene(countMat, markerB, "markerB", assayName)
-    librarySize = colSums(countMat)
+    librarySize = Matrix::colSums(countMat) # works for dense and sparse counts
     cells$normA = countMat[markerA, ] / librarySize
     cells$normB = countMat[markerB, ] / librarySize
 
