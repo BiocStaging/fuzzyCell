@@ -59,6 +59,8 @@ Every analysis can be run twice on the same data, once with the original hard la
 | whether two cell types co-localise more or less between outcomes | `runColocalisationModels()` | [spicyR](https://bioconductor.org/packages/spicyR)'s L-function, and Statial's Kontextual test for relative co-localisation |
 | whether tissue neighbourhoods (niches) differ between outcomes | `runNicheIdentification()`, `testNicheOutcome()` | [lisaClust](https://bioconductor.org/packages/lisaClust) |
 
+The rest of this vignette follows the workflow on a real dataset.
+
 # Installation
 
 ```{r install, eval = FALSE}
@@ -72,102 +74,15 @@ BiocManager::install("fuzzyCell")
 fuzzyCell builds on recent versions of spicyR (>= 1.99.32) and lisaClust (>= 1.21.9), which come with Bioconductor 3.24 and later.
 :::
 
-# Quick start
+# Example data: heart transplant biopsies
 
-Before the real data, a small simulated example that runs in seconds and shows what confidence looks like.
-
-## Toy data
-
-We simulate eight images with two closely related cell types, `A` and `B`, that differ in only six of 40 genes, and one clearly different type, `C`. Half of the images are from `healthy` samples, where most of the A/B cells are `A`, and half from `disease` samples, where most are `B`.
-
-```{r toy}
-library(fuzzyCell)
-library(SpatialExperiment)
-
-set.seed(2025)
-nGenes = 40
-geneMeans = list(A = rgamma(nGenes, shape = 2, rate = 2), C = rgamma(nGenes, shape = 2, rate = 2))
-geneMeans$B = geneMeans$A
-geneMeans$B[1:6] = geneMeans$B[1:6] * 3   # B differs from A in just a few genes
-
-simulateImage = function(imageID, shareA, outcome, nCells = 300) {
-    type = sample(c("A", "B", "C"), nCells, replace = TRUE,
-        prob = c(0.5 * shareA, 0.5 * (1 - shareA), 0.5))
-    counts = vapply(type, function(t) rpois(nGenes, geneMeans[[t]]), numeric(nGenes))
-    ids = paste0(imageID, "_", seq_len(nCells))
-    dimnames(counts) = list(paste0("gene", seq_len(nGenes)), ids)
-    SpatialExperiment(
-        assays = list(counts = counts),
-        colData = S4Vectors::DataFrame(cellID = ids, imageID = imageID, patient = imageID,
-            outcome = outcome, cellType = type),
-        spatialCoords = cbind(x = runif(nCells, 0, 1000), y = runif(nCells, 0, 1000)))
-}
-toy = do.call(BiocGenerics::cbind, lapply(1:8, function(i)
-    simulateImage(paste0("img", i), shareA = if (i <= 4) 0.7 else 0.3,
-        outcome = if (i <= 4) "healthy" else "disease")))
-toy
-```
-
-The *cell type tree* tells fuzzyCell which labels are easily confused. Here `A` and `B` form a group, and `C` stands alone under its own name.
-
-```{r toytree}
-toyTree = list("AB" = list(children = c("A", "B")), "Other" = "C")
-```
-
-## Confidence in each cell's label
-
-```{r toyboot, results = "hide"}
-toyConf = bootstrapLineageConfidence(toy, toyTree, nBoot = 50, seed = 1)
-```
-
-The result is one table per group: a confidence for every cell in each subtype of the group.
-
-```{r toyhead}
-head(toyConf$AB)
-```
-
-How confident is each cell in the label it was given originally?
-
-```{r toyhist, fig.height = 3, fig.width = 6, fig.alt = "Histograms of confidence in the original label, for cells labelled A and cells labelled B."}
-conf = toyConf$AB
-original = toy$cellType[match(conf$cellID, toy$cellID)]
-ownConfidence = ifelse(original == "A", conf$A, conf$B)
-ggplot(data.frame(original, ownConfidence), aes(ownConfidence)) +
-    geom_histogram(bins = 20, fill = "#4c78a8", colour = "white") +
-    facet_wrap(~original, labeller = label_both) +
-    labs(x = "confidence in the original label", y = "number of cells") +
-    theme_classic()
-```
-
-About `r round(100 * mean(ownConfidence >= 0.9))`% of the cells are very confident in their label (0.9 or more), but about `r round(100 * mean(ownConfidence > 0.2 & ownConfidence < 0.8))`% sit in the middle: their counts are consistent with both subtypes. A hard label gives each of those cells a full vote for one subtype. The weights give them a partial vote for each.
-
-## A weighted analysis
-
-Does the proportion of each subtype differ between the healthy and disease samples? We ask once with the original labels and once with the confidences:
-
-```{r toyprops, results = "hide"}
-toyProps = runProportionsPipeline(toy, toyTree, toyConf,
-    outcomeCol = "outcome", subject = "patient")
-```
-
-```{r toypropsshow}
-cols = c("cellType", "estimate", "p.value", "p.adj")
-toyProps$modelUnweighted[toyProps$modelUnweighted$cellType %in% c("A", "B"), cols]
-toyProps$modelWeighted[toyProps$modelWeighted$cellType %in% c("A", "B"), cols]
-```
-
-::: {.callout-tip}
-## Reading the models
-`estimate` is the difference for the *second* level of the outcome compared with the first (alphabetical order for text, factor order for factors). Here that is `healthy` minus `disease`. `p.adj` is the Benjamini-Hochberg adjusted p-value across the cell types tested.
-:::
-
-# Case study: heart transplant biopsies
-
-Now for real data. We follow the whole workflow on Xenium biopsies from heart transplant patients with cellular rejection (Amancherla et al., 2025), available as `SpatialDatasets::spe_Amancherla_2025()`. `loadAmancherla()` downloads them and prepares them for fuzzyCell by keeping one image per patient. We use the biopsies taken before transplant (`timing = "pre"`). Each patient's outcome after transplant is stored in `resolution_broad`: the rejection either `"resolved"` or showed `"persistence"`.
-
-## The data
+We follow the whole workflow on Xenium biopsies from heart transplant patients with cellular rejection (Amancherla et al., 2025), available as `SpatialDatasets::spe_Amancherla_2025()`. `loadAmancherla()` downloads them and prepares them for fuzzyCell by keeping one image per patient. We use the biopsies taken before transplant (`timing = "pre"`). Each patient's outcome after transplant is stored in `resolution_broad`: the rejection either `"resolved"` or showed `"persistence"`.
 
 ```{r data}
+library(fuzzyCell)
+library(SpatialExperiment)
+library(ggplot2)
+
 spe = loadAmancherla("pre")
 spe
 
@@ -180,7 +95,7 @@ table(imageOutcome$resolution_broad)
 Any `SummarizedExperiment` (such as a `SpatialExperiment`) works as long as it has a `"counts"` assay and the cell metadata columns `cellID`, `imageID`, `cellType`, `x` and `y` in its `colData`. If your columns are named differently, the analysis functions take arguments (such as `cellType` and `imageID`) giving the column names.
 :::
 
-## The cell type tree
+# The cell type tree
 
 Confidence is calculated between closely related cell types, so fuzzyCell needs to know which those are. You describe them in a nested list: a group of subtypes that should be refined together is written `list(children = ...)`, and everything else is either organisational nesting (a lineage such as `"Immune"`) or a plain leaf cell type (such as `"NK"`).
 
@@ -211,7 +126,7 @@ buildCellTypeMap(tree)$groupsWithChildren
 
 Six groups will get confidence scores. Cell types outside a group, such as `NK` and `Mast`, are not refined and keep their hard labels. The same tree is included in the package as `heartCellTypeTree`.
 
-## Bootstrap confidence
+# Bootstrap confidence
 
 `bootstrapLineageConfidence()` does the work, group by group, as described in the Overview. We use 20 resamples to keep the vignette quick, but we encourage at least 100 for your own analysis.
 
@@ -249,7 +164,7 @@ The groups differ a lot. The most uncertain are **`r names(uncertain)[1]`** (`r 
 By default each group's classifier is ridge multinomial logistic regression on the first 50 principal components of its cells (`classifier = "pcaLogistic"`). `"logistic"` fits it on all genes, and `"rf"`, `"lda"` and `"svm"` are also available. The classifier is trained with the same number of cells of each subtype, which gives every subtype the same prior; `priors = "observed"` instead weights each subtype by its share of the group's cells, so a cell is not drawn towards a rare subtype only because the subtypes were balanced in training.
 :::
 
-## Cell type proportions
+# Cell type proportions
 
 Does the proportion of each cell type differ between patients whose rejection resolved and those where it persisted? `runProportionsPipeline()` tests it with the confidences as soft counts (weighted) and with the original labels (unweighted).
 
@@ -262,6 +177,11 @@ props = runProportionsPipeline(spe, tree, confList,
 head(props$modelWeighted)
 head(props$modelUnweighted)
 ```
+
+::: {.callout-tip}
+## Reading the models
+`estimate` is the difference for the *second* level of the outcome compared with the first (alphabetical order for text, factor order for factors). Here that is `resolved` minus `persistence`. `p.adj` is the Benjamini-Hochberg adjusted p-value across the cell types tested.
+:::
 
 Do the two analyses agree? Each point below is a cell type, comparing its estimated difference in proportion without and with the confidences. The two cell types that move the most are labelled.
 
@@ -311,7 +231,7 @@ Marker expression helps to judge whether the confidences are sensible. Here is `
 plotOneMarkerSpatial(spe, "Patient_4_1", "T cells", "CD4", cellTypeTree = tree)
 ```
 
-### Proportions relative to the parent group
+## Proportions relative to the parent group
 
 The proportion of a subtype among all cells can change simply because its whole group changes. `runProportionsRelativeToParentPipeline()` instead measures each subtype as a proportion of its group, for example CD4+ T cells among all T cells, and tests that in the same way.
 
@@ -321,6 +241,7 @@ relProps = runProportionsRelativeToParentPipeline(spe, tree, confList,
 ```
 
 ```{r relpropscompare}
+cols = c("cellType", "estimate", "p.value", "p.adj")
 rbind(
     unweighted = subset(relProps$modelUnweighted, cellType == "CD4+ T cells")[, cols],
     weighted = subset(relProps$modelWeighted, cellType == "CD4+ T cells")[, cols])
@@ -330,7 +251,7 @@ rbind(
 plotProportionBoxplot(relProps, "CD4+ T cells", spe, "resolution_broad")
 ```
 
-## Co-localisation
+# Co-localisation
 
 Do two cell types sit closer together, or further apart, in one outcome than the other? `runColocalisationModels()` answers it for every pair of cell types and groups.
 
@@ -385,7 +306,7 @@ plotMetricBoxplot(coloc, speSub, "CD8+ T cells", "Macrophages",
 Every pair of cell types and groups is tested, so there are many tests, and groups overlap with their own subtypes. Look at `p.adj` (Benjamini-Hochberg) rather than `p.value`, and treat a pair that is only significant before adjustment as a lead to follow up, not a finding.
 :::
 
-## Niches
+# Niches
 
 Niches are recurring local neighbourhoods: groups of cells that share a similar mix of surrounding cell types. `runNicheIdentification()` describes every cell by its local indicators of spatial association from lisaClust, at several radii, and clusters those profiles into `k` niches. It does this twice, with the hard labels and with the weights, in which each neighbour counts towards a cell type in proportion to its confidence.
 
