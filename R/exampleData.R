@@ -76,3 +76,52 @@ loadAmancherla = function(timing = c("pre", "post", "both"), seed = 51773) {
 #' @docType data
 #' @keywords datasets
 "heartCellTypeTree"
+
+#' A small cropped subset of the pulmonary fibrosis lung data
+#'
+#' Xenium data of lung biopsies from Vannan et al. (2025), available in full as
+#' `SpatialDatasets::spe_Vannan_2025()`, cut down to ship with the package. It
+#' has five control and five pulmonary fibrosis biopsies (the five with the
+#' fewest cells of each), each cropped to the roughly 3,000 cells in a square
+#' window at its centre, so each image is a window of a larger biopsy. Every
+#' image comes from a different subject. Cell types with fewer than 20 cells in
+#' the windows are removed. The hierarchy for these cell types is in
+#' [lungCellTypeTree].
+#'
+#' @format A `SpatialExperiment` with the raw counts of 343 genes in 29,971
+#'   cells (assay `counts`), the cell coordinates in `spatialCoords()`, and in
+#'   `colData`:
+#' \describe{
+#'   \item{cellID}{A unique cell ID.}
+#'   \item{imageID}{The image (the window of a biopsy); also `sample_id`.}
+#'   \item{subject}{The patient.}
+#'   \item{cellType}{The cell type label.}
+#'   \item{disease_status}{`"Control"` or `"Disease"`.}
+#' }
+#' @source Built from `SpatialDatasets::spe_Vannan_2025()` by
+#'   `data-raw/lungSubset.R`.
+#' @examples
+#' data(lungSubset)
+#' lungSubset
+#' table(lungSubset$imageID, lungSubset$disease_status)
+#' @name lungSubset
+#' @docType data
+#' @keywords datasets
+"lungSubset"
+
+#' Cell type tree for the lung data
+#'
+#' The cell type hierarchy for [lungSubset] (and the full
+#' `SpatialDatasets::spe_Vannan_2025()` data): broad lineages, groups of closely
+#' related subtypes (for example the fibroblast subtypes), and ungrouped leaf
+#' cell types. See [cellTypeTree] for the format.
+#'
+#' @format A nested list; see [cellTypeTree].
+#' @source Defined in `data-raw/lungCellTypeTree.R`.
+#' @examples
+#' data(lungCellTypeTree)
+#' buildCellTypeMap(lungCellTypeTree)$groupsWithChildren
+#' @name lungCellTypeTree
+#' @docType data
+#' @keywords datasets
+"lungCellTypeTree"
