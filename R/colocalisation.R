@@ -187,8 +187,13 @@ runColocalisationModels = function(spe, cellTypeTree, confList, outcomeCol, r = 
             subject = sub, r = r, cellWeights = weights[[v]])
     }
 
-    model = function(x, p = NULL) if (is.null(x)) data.frame() else modelTable(x, p)
-    perImage = function(x) if (is.null(x)) data.frame() else perImageEffects(x)
+    # with no pair having an eligible parent, the relative tables are empty but keep their columns
+    noModel = data.frame(from = character(), to = character(), parent = character(), estimate = numeric(),
+        se = numeric(), statistic = numeric(), p.value = numeric(), p.adj = numeric())
+    noImages = data.frame(imageID = character(), from = character(), to = character(),
+        colocalisation = numeric(), parent = character())
+    model = function(x, p = NULL) if (is.null(x)) noModel else modelTable(x, p)
+    perImage = function(x) if (is.null(x)) noImages else perImageEffects(x)
     list(
         weighted = perImage(res$weighted), unweighted = perImage(res$unweighted),
         modelWeighted = model(res$weighted, pairs), modelUnweighted = model(res$unweighted, pairs),

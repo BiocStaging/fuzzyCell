@@ -158,3 +158,18 @@ test_that("the column arguments of runColocalisationModels are checked", {
     expect_error(runColocalisationModels(dup, d$tree, d$conf, "outcome"),
         "must contain unique, non-missing cell IDs")
 })
+
+test_that("relative results keep their columns when no pair has an eligible parent", {
+    res = quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome",
+        parentOverrides = c(A = "A", B = "B")))
+    for (v in c("relativeWeighted", "relativeUnweighted")) {
+        expect_equal(nrow(res[[v]]), 0)
+        expect_named(res[[v]], c("imageID", "from", "to", "colocalisation", "parent"))
+    }
+    for (v in c("modelRelativeWeighted", "modelRelativeUnweighted")) {
+        expect_equal(nrow(res[[v]]), 0)
+        expect_named(res[[v]], c("from", "to", "parent", "estimate", "se", "statistic", "p.value", "p.adj"))
+    }
+    expect_error(plotMetricBoxplot(res, d$spe, "A", "B", "outcome", metric = "kontextual"),
+        "is not in the results")
+})

@@ -26,7 +26,9 @@ assay and per-cell cell type labels and unique cell IDs in \code{colData}.}
 
 \item{cellTypeTree}{A cell type tree, see \link{cellTypeTree}.}
 
-\item{nFolds}{Number of folds.}
+\item{nFolds}{Number of folds. The folds are stratified by cell type, so
+every fold's classifier is trained on every child cell type; each child cell
+type therefore needs at least 2 cells.}
 
 \item{nPerClass}{Minimum number of training cells per class; classes
 smaller than this are up-sampled with replacement.}

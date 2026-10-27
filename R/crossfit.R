@@ -23,13 +23,34 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
     classifier = match.arg(classifier)
     priors = match.arg(priors)
     labels = as.character(labels)
+    if (!is.numeric(nFolds) || length(nFolds) != 1 || is.na(nFolds) || nFolds != round(nFolds) ||
+        nFolds < 2 || nFolds > length(labels)) {
+        stop("`nFolds` must be a whole number between 2 and the number of cells (", length(labels), ")",
+            call. = FALSE)
+    }
+    # every training split needs every class, so a class needs cells in at least 2 folds
+    classSizes = table(labels)
+    tooSmall = names(classSizes)[classSizes < 2]
+    if (length(tooSmall) > 0) {
+        stop("Each class needs at least 2 cells, so that every fold's training cells include it, but ",
+            paste0("'", tooSmall, "' has ", classSizes[tooSmall], collapse = ", "),
+            ". Drop or merge these cell types.", call. = FALSE)
+    }
+    if (is.null(colnames(countMat))) colnames(countMat) = paste0("gene", seq_len(ncol(countMat)))
     if (!is.null(seed)) set.seed(seed)
     scaledMat = scaleCountMat(countMat)
     keep = apply(scaledMat, 2, var) > 0
     keep = keep & !is.na(keep)
     scaledMat = scaledMat[, keep, drop = FALSE]
     classes = sort(unique(labels))
-    fold = sample(rep(seq_len(nFolds), length.out = length(labels)))
+    # stratified folds: the cells of each class, shuffled, are dealt round the folds in turn, so a class of
+    # at least 2 cells has cells in at least 2 folds and the fold sizes differ by at most 1
+    dealt = unlist(lapply(classes, function(lab) {
+        idx = which(labels == lab)
+        idx[sample.int(length(idx))]
+    }))
+    fold = integer(length(labels))
+    fold[dealt] = rep(seq_len(nFolds), length.out = length(labels))
     out = matrix(NA_real_, length(labels), length(classes), dimnames = list(NULL, classes))
     # one fold per task; each draws its balanced training set from its own random stream
     seeds = sample.int(.Machine$integer.max, nFolds)
@@ -66,7 +87,9 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #' type the same prior weight.
 #'
 #' @inheritParams bootstrapLineageConfidence
-#' @param nFolds Number of folds.
+#' @param nFolds Number of folds. The folds are stratified by cell type, so
+#'   every fold's classifier is trained on every child cell type; each child cell
+#'   type therefore needs at least 2 cells.
 #' @param classifier `"pcaLogistic"` (the default), `"logistic"`, `"rf"` or `"lda"`, as in
 #'   [bootstrapClassify()].
 #' @param priors `"balanced"` (equal priors, as the classifier is trained) or

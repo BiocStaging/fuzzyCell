@@ -10,8 +10,9 @@ trainClassifier = function(x, y, classifier = c("pcaLogistic", "logistic", "rf",
     if (classifier %in% c("logistic", "pcaLogistic")) {
         # pcaLogistic: the cells' first nPC principal components (of the training cells) in place of the genes
         proj = NULL
-        if (classifier == "pcaLogistic") {
-            k = min(nPC, ncol(x) - 1, nrow(x) - 1)
+        k = min(nPC, ncol(x) - 1, nrow(x) - 1)
+        # glmnet needs at least two predictors, so with fewer than three genes the genes are used as they are
+        if (classifier == "pcaLogistic" && k >= 2) {
             pc = irlba::prcomp_irlba(x, n = k, center = TRUE, scale. = FALSE)
             proj = list(genes = colnames(x), center = pc$center, rotation = pc$rotation)
             x = pc$x
@@ -39,22 +40,33 @@ trainClassifier = function(x, y, classifier = c("pcaLogistic", "logistic", "rf",
 
 # Multinomial resampling of every cell's counts at its own total, in one pass:
 # each of a cell's transcripts is drawn with replacement from its observed
-# transcripts. `layout` is from resampleLayout().
-resampleLayout = function(countMat) {
+# transcripts. `layout` is from resampleLayout(). The cells are resampled in
+# blocks of about `blockSize` transcripts, which bounds the memory a resample
+# needs; the draws, and so the counts, do not depend on the blocks.
+resampleLayout = function(countMat, blockSize = 2^22) {
+    # whole numbers stored with floating-point error would shift the transcript boundaries
+    countMat = round(countMat)
     nz = which(countMat > 0, arr.ind = TRUE)
     nz = nz[order(nz[, 1], nz[, 2]), , drop = FALSE]
     n = countMat[nz]
     totals = as.numeric(rowSums(countMat))
     list(nz = nz, ends = cumsum(n), start = c(0, cumsum(totals))[seq_len(nrow(countMat))],
-        totals = totals, dim = dim(countMat), dimnames = dimnames(countMat))
+        totals = totals, blocks = split(seq_along(totals), cumsum(totals) %/% blockSize),
+        dim = dim(countMat), dimnames = dimnames(countMat))
 }
 resampleCounts = function(layout) {
-    cell = rep.int(seq_along(layout$totals), layout$totals)
-    # a uniform position among the cell's transcripts, then the gene it falls in
-    pos = layout$start[cell] + ceiling(stats::runif(length(cell)) * layout$totals[cell])
-    entry = findInterval(pos - 1, layout$ends) + 1
+    hits = integer(nrow(layout$nz))
+    for (cells in layout$blocks) {
+        cell = rep.int(cells, layout$totals[cells])
+        if (length(cell) == 0) next
+        # a uniform position among the cell's transcripts, then the gene it falls in
+        pos = layout$start[cell] + ceiling(stats::runif(length(cell)) * layout$totals[cell])
+        entry = findInterval(pos - 1, layout$ends) + 1
+        # a block's cells own a contiguous run of the nonzero entries
+        lo = min(entry)
+        hits[lo:max(entry)] = tabulate(entry - lo + 1L, max(entry) - lo + 1L)
+    }
     out = matrix(0L, layout$dim[1], layout$dim[2], dimnames = layout$dimnames)
-    hits = tabulate(entry, nrow(layout$nz))
     out[layout$nz] = hits
     out
 }
@@ -150,6 +162,8 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, BPPA
     classifier = match.arg(classifier)
     priors = match.arg(priors)
     labels = as.character(labels)
+    # the logistic fits find their genes by name, so unnamed genes are named by position
+    if (is.null(colnames(countMat))) colnames(countMat) = paste0("gene", seq_len(ncol(countMat)))
 
     if (nrow(countMat) != length(labels)) {
         stop("countMat has ", nrow(countMat), " rows but labels has ",

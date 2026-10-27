@@ -268,3 +268,62 @@ test_that("pcaLogistic classifies on principal components", {
     b = suppressMessages(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 3, seed = 1, classifier = "pcaLogistic"))
     expect_equal(unname(rowSums(b$G[, c("A", "B")])), rep(1, nrow(b$G)))
 })
+
+test_that("pcaLogistic fits the genes themselves when only two genes vary", {
+    d = makeCounts()
+    counts = d$counts[, c(1, 4)]
+    freq = suppressMessages(bootstrapClassify(counts, d$labels, nBoot = 5, seed = 1))
+    expect_equal(unname(rowSums(freq)), rep(1, nrow(freq)))
+})
+
+test_that("an unnamed count matrix gives the same confidences as a named one", {
+    d = makeCounts()
+    unnamed = unname(d$counts)
+    for (classifier in c("pcaLogistic", "logistic")) {
+        f1 = suppressMessages(bootstrapClassify(d$counts, d$labels, nBoot = 5, seed = 1, classifier = classifier))
+        f2 = suppressMessages(bootstrapClassify(unnamed, d$labels, nBoot = 5, seed = 1, classifier = classifier))
+        expect_equal(f2, f1)
+    }
+    p1 = crossfitClassify(d$counts, d$labels, nFolds = 3, seed = 1)
+    p2 = crossfitClassify(unnamed, d$labels, nFolds = 3, seed = 1)
+    expect_equal(p2, p1)
+})
+
+test_that("whole-number counts with floating-point error are resampled as their rounded values", {
+    x = rbind(c(6 * 0.1 / 0.1, 1))
+    set.seed(1)
+    draws = replicate(500, resampleCounts(resampleLayout(x))[1, 2])
+    expect_gt(mean(draws), 0)
+    expect_equal(sum(resampleCounts(resampleLayout(x))), 7)
+})
+
+test_that("resampling in blocks of cells gives the same counts", {
+    d = makeCounts()
+    set.seed(1)
+    whole = resampleCounts(resampleLayout(d$counts))
+    set.seed(1)
+    blocked = resampleCounts(resampleLayout(d$counts, blockSize = 30))
+    expect_gt(length(resampleLayout(d$counts, blockSize = 30)$blocks), 1)
+    expect_identical(blocked, whole)
+})
+
+test_that("crossfit folds keep every class in every training split", {
+    d = makeCounts()
+    lab = d$labels
+    lab[lab == "B"][-(1:2)] = "A" # B has only 2 cells
+    for (seed in 1:5) {
+        p = crossfitClassify(d$counts, lab, nFolds = 2, seed = seed)
+        expect_equal(unname(rowSums(p)), rep(1, nrow(p)))
+        expect_true(all(p[, "B"] > 0))
+    }
+})
+
+test_that("crossfitClassify rejects singleton classes and impossible fold counts", {
+    d = makeCounts()
+    lab = d$labels
+    lab[lab == "B"][-1] = "A"
+    expect_error(crossfitClassify(d$counts, lab, nFolds = 3), "'B' has 1")
+    for (k in list(1, 2.5, NA, c(2, 3), nrow(d$counts) + 1)) {
+        expect_error(crossfitClassify(d$counts, d$labels, nFolds = k), "`nFolds` must be")
+    }
+})

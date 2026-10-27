@@ -12,6 +12,13 @@
 * `crossfitLineageProbabilities()`: cross-fitted class probabilities, an alternative to the bootstrap.
 * The bootstrap resamples all cells' counts in one pass, grows a random forest on the workers, and accepts sparse
   counts.
+* The bootstrap resamples the cells in blocks of about 4 million transcripts, so its memory no longer grows with the
+  lineage's total count (the counts drawn are unchanged), and rounds counts stored with floating-point error.
+* `classifier = "pcaLogistic"` fits the genes themselves when fewer than three vary, and the logistic classifiers
+  accept a count matrix without gene names.
+* `crossfitLineageProbabilities()` stratifies its folds by cell type, so every fold's classifier sees every child
+  cell type; a child cell type needs at least 2 cells.
+* When no pair has an eligible parent, the relative co-localisation tables are empty but keep their columns.
 
 # fuzzyCell 0.99.0
 
