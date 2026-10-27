@@ -62,6 +62,12 @@ generateComparisons = function(cellTypeTree, confList) {
 # log1p-normalizes and z-scores every row (cell) of a cells x genes count matrix
 # in one
 # vectorized pass. Cells with zero total count come out all-zero.
+# TRUE for the columns of a matrix whose values are not all the same (variance above 0)
+varyingColumns = function(mat) {
+    if (nrow(mat) < 2) return(rep(FALSE, ncol(mat)))
+    colSums(mat != rep(mat[1, ], each = nrow(mat))) > 0
+}
+
 scaleCountMat = function(mat) {
     totals = rowSums(mat)
     norm = log1p(mat / pmax(totals, 1) * 1e4)

@@ -7,7 +7,7 @@
 * Niches (`runNicheIdentification()`) cluster lisaClust's local curves with the weights (`lisaClust::lisa()`).
 * `confidenceWeights()` turns a confidence list into the cells x labels weight matrix spicyR and lisaClust take.
 * The default classifier is ridge multinomial logistic regression on the first 50 principal components
-  (`classifier = "pcaLogistic"`, glmnet and irlba); `"logistic"` fits it on all genes.
+  (`classifier = "pcaLogistic"`, glmnet; the components are exact for up to 5,000 genes and from irlba beyond); `"logistic"` fits it on all genes.
 * `priors = "observed"` weights each class by its share of the group's cells instead of equally.
 * `crossfitLineageProbabilities()`: cross-fitted class probabilities, an alternative to the bootstrap.
 * The bootstrap resamples all cells' counts in one pass, grows a random forest on the workers, and accepts sparse
@@ -20,6 +20,10 @@
   lisaClust: the workers are forked once per call and run BLAS on one thread, and tasks are handed out in about
   eight chunks per worker. The bootstrap and cross-fitting run BLAS on one thread throughout, serially too.
   Results are unchanged.
+* Faster bootstrap with the logistic classifiers: each resample is predicted from its nonzero counts alone,
+  without building and scaling a dense matrix, and `pcaLogistic` computes its principal components exactly for up
+  to 5,000 genes (heart T cells, 15,063 cells x 477 genes, 100 resamples: 72.7 s to 22.9 s on one core, identical
+  confidences).
 * `correctedCounts = TRUE` in `bootstrapClassify()` and `bootstrapLineageConfidence()` accepts counts that are not
   whole numbers, such as counts corrected for ambient RNA, and resamples them as they are; they must still be on
   the scale of molecule counts. By default counts must be whole numbers, as before.

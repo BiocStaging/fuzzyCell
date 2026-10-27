@@ -13,7 +13,7 @@ trainClassifier = function(x, y, classifier = c("pcaLogistic", "logistic", "rf",
         k = min(nPC, ncol(x) - 1, nrow(x) - 1)
         # glmnet needs at least two predictors, so with fewer than three genes the genes are used as they are
         if (classifier == "pcaLogistic" && k >= 2) {
-            pc = irlba::prcomp_irlba(x, n = k, center = TRUE, scale. = FALSE)
+            pc = principalComponents(x, k)
             proj = list(genes = colnames(x), center = pc$center, rotation = pc$rotation)
             x = pc$x
             colnames(x) = paste0("PC", seq_len(ncol(x)))
@@ -37,6 +37,20 @@ trainClassifier = function(x, y, classifier = c("pcaLogistic", "logistic", "rf",
     )
 }
 
+# The first k principal components of x (centred, not scaled), as from
+# irlba::prcomp_irlba(). Up to 5,000 genes they come from the eigenvectors of the
+# genes' cross-product matrix, which is exact and faster (10,000 cells: 0.8 s
+# against 11 s for irlba with 1,000 genes, 34 s against 84 s with 5,000); with
+# more genes the eigendecomposition grows as the cube of the number of genes, and
+# irlba is used.
+principalComponents = function(x, k) {
+    if (ncol(x) > 5000) return(irlba::prcomp_irlba(x, n = k, center = TRUE, scale. = FALSE))
+    center = colMeans(x)
+    x = sweep(x, 2, center)
+    rotation = eigen(crossprod(x), symmetric = TRUE)$vectors[, seq_len(k), drop = FALSE]
+    list(center = center, rotation = rotation, x = x %*% rotation)
+}
+
 # Multinomial resampling of every cell's counts: a cell's resample draws as many
 # transcripts as its total (rounded), each from gene j with probability count_j /
 # total, the counts taken as they are (whole or not). `layout` is from
@@ -57,7 +71,8 @@ resampleLayout = function(countMat, blockSize = 2^22) {
         blocks = split(seq_along(draws), cumsum(draws) %/% blockSize),
         dim = dim(countMat), dimnames = dimnames(countMat))
 }
-resampleCounts = function(layout) {
+# The resampled count of each of the cells' nonzero entries (layout$nz).
+resampleHits = function(layout) {
     hits = integer(nrow(layout$nz))
     for (cells in layout$blocks) {
         cell = rep.int(cells, layout$draws[cells])
@@ -71,9 +86,54 @@ resampleCounts = function(layout) {
         lo = min(entry)
         hits[lo:max(entry)] = tabulate(entry - lo + 1L, max(entry) - lo + 1L)
     }
+    hits
+}
+# The resampled counts as a cells x genes matrix.
+resampleCounts = function(layout) {
     out = matrix(0L, layout$dim[1], layout$dim[2], dimnames = layout$dimnames)
-    out[layout$nz] = hits
+    out[layout$nz] = resampleHits(layout)
     out
+}
+
+# A logistic fit as one linear map from the scaled genes (scaleCountMat(), all
+# genes) to the linear predictors: eta = z %*% W + offset, with W zero for the
+# genes the fit does not use (`keep` FALSE). For pcaLogistic, W folds the
+# projection onto the principal components into the coefficients, and the offset
+# the centring.
+linearMap = function(fit, keep) {
+    # the rows of beta are fit$genes, and those of the rotation fit$proj$genes, in order
+    W = fit$beta
+    offset = fit$a0
+    genes = fit$genes
+    if (!is.null(fit$proj)) {
+        W = fit$proj$rotation %*% W
+        offset = offset - drop(fit$proj$center %*% W)
+        genes = fit$proj$genes
+    }
+    full = matrix(0, length(keep), ncol(W), dimnames = list(NULL, colnames(fit$beta)))
+    full[match(genes, names(keep)), ] = W
+    list(W = full, offset = offset, colSumW = colSums(full))
+}
+
+# The linear predictors of a resample from its nonzero entries only, equal (up
+# to rounding) to those of scaleCountMat() on the whole matrix: a cell's scaled
+# value is (l - m) / s, with l = log1p(count / total * 1e4) zero wherever the
+# count is, and m and s the mean and SD of l over all genes, so
+# z %*% W = (l %*% W - m * colSums(W)) / s.
+resampleEta = function(layout, hits, map) {
+    nGenes = layout$dim[2]
+    cell = layout$nz[, 1]
+    l = log1p(hits / pmax(layout$draws, 1)[cell] * 1e4)
+    # genes x cells, column-compressed: the entries are ordered by cell, then gene
+    lt = Matrix::sparseMatrix(i = layout$nz[, 2], p = c(0L, layout$last), x = l,
+        dims = c(nGenes, layout$dim[1]))
+    eta = as.matrix(Matrix::crossprod(lt, map$W))
+    m = Matrix::colSums(lt) / nGenes
+    lt@x = l^2
+    s = sqrt(pmax(Matrix::colSums(lt) - nGenes * m^2, 0) / (nGenes - 1))
+    s[s == 0] = 1
+    eta = (eta - outer(m, map$colSumW)) / s
+    sweep(eta, 2, map$offset, "+")
 }
 
 # Predict class labels, uniformly as a character vector regardless of classifier
@@ -134,7 +194,8 @@ predictClassifierClass = function(fit, newx, classifier = c("pcaLogistic", "logi
 #' @param seed Random seed for reproducibility, or `NULL`. Recommended for reproducibility.
 #' @param classifier One of `"pcaLogistic"` (ridge multinomial logistic
 #'   regression, via glmnet, with the penalty chosen by cross-validation, on the
-#'   first 50 principal components of the training cells, via irlba; the
+#'   first 50 principal components of the training cells, computed exactly
+#'   for up to 5,000 genes and with irlba beyond; the
 #'   default), `"logistic"` (the same on all genes), `"rf"` (random forest, via randomForest), `"lda"` (linear
 #'   discriminant analysis, via MASS) or `"svm"` (support vector machine, via
 #'   e1071).
@@ -227,7 +288,7 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, core
 
     message("Minimum class size: ", targetSize)
 
-    keep = apply(scaledMat, 2, var) > 0 # drop zero-variance genes
+    keep = varyingColumns(scaledMat) # drop zero-variance genes
     if (!any(keep, na.rm = TRUE)) {
         stop("Every gene has zero variance across these cells, so there is ",
             "nothing to classify on. Check that countMat is a cells x genes ",
@@ -247,7 +308,15 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, core
     # observed priors: the classes' shares among these cells
     logPrior = if (priors == "observed") log(c(table(labels)) / length(labels))
     layout = resampleLayout(countMat)
+    # a logistic fit is applied to the resamples' nonzero entries alone, without
+    # building and scaling each resample as a dense matrix
+    map = if (classifier %in% c("logistic", "pcaLogistic")) linearMap(fit, stats::setNames(keep, colnames(countMat)))
     preds = parLapply(seq_len(nBoot), function(b) {
+        if (!is.null(map)) {
+            eta = resampleEta(layout, resampleHits(layout), map)
+            if (!is.null(logPrior)) eta = sweep(eta, 2, logPrior[colnames(eta)], "+")
+            return(colnames(eta)[max.col(eta, ties.method = "first")])
+        }
         bootMat = resampleCounts(layout)
         predictClassifierClass(fit, scaleCountMat(bootMat)[, keep, drop = FALSE], classifier, logPrior)
     }, parallelParam(cores, seed))

@@ -341,12 +341,30 @@ test_that("the classifiers run BLAS on one thread and restore the session's sett
     RhpcBLASctl::blas_set_num_threads(2L)
     d = makeCounts()
     seen = NULL
-    predict = predictClassifierClass
-    local_mocked_bindings(predictClassifierClass = function(...) {
+    resample = resampleHits
+    local_mocked_bindings(resampleHits = function(...) {
         seen <<- c(seen, RhpcBLASctl::blas_get_num_procs())
-        predict(...)
+        resample(...)
     })
     suppressMessages(bootstrapClassify(d$counts, d$labels, nBoot = 2, seed = 1))
     expect_true(length(seen) > 0 && all(seen == 1L))
     expect_equal(RhpcBLASctl::blas_get_num_procs(), 2L)
+})
+
+test_that("logistic fits predict resamples from their nonzero entries as from the whole matrix", {
+    d = makeCounts()
+    counts = d$counts
+    counts[3, ] = 0 # a cell with no counts
+    scaled = scaleCountMat(counts)
+    keep = stats::setNames(varyingColumns(scaled), colnames(counts))
+    layout = resampleLayout(counts)
+    set.seed(1)
+    hits = resampleHits(layout)
+    boot = matrix(0L, nrow(counts), ncol(counts), dimnames = dimnames(counts))
+    boot[layout$nz] = hits
+    for (classifier in c("pcaLogistic", "logistic")) {
+        fit = suppressWarnings(trainClassifier(scaled[, keep], d$labels, classifier))
+        expect_equal(resampleEta(layout, hits, linearMap(fit, keep)),
+            logisticEta(fit, scaleCountMat(boot)[, keep, drop = FALSE]), tolerance = 1e-10, ignore_attr = TRUE)
+    }
 })

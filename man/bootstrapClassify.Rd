@@ -39,7 +39,8 @@ identical whatever the number of cores.}
 
 \item{classifier}{One of \code{"pcaLogistic"} (ridge multinomial logistic
 regression, via glmnet, with the penalty chosen by cross-validation, on the
-first 50 principal components of the training cells, via irlba; the
+first 50 principal components of the training cells, computed exactly
+for up to 5,000 genes and with irlba beyond; the
 default), \code{"logistic"} (the same on all genes), \code{"rf"} (random forest, via randomForest), \code{"lda"} (linear
 discriminant analysis, via MASS) or \code{"svm"} (support vector machine, via
 e1071).}

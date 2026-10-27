@@ -3,7 +3,7 @@ predictClassifierProb = function(fit, newx, classifier = c("pcaLogistic", "logis
     classifier = match.arg(classifier)
     if (classifier %in% c("logistic", "pcaLogistic")) {
         eta = logisticEta(fit, newx)
-        eta = eta - apply(eta, 1, max)
+        eta = eta - eta[cbind(seq_len(nrow(eta)), max.col(eta, ties.method = "first"))]
         p = exp(eta)
         return(p / rowSums(p))
     }
@@ -41,8 +41,7 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
     on.exit(setBlasThreads(blasThreads), add = TRUE)
     if (!is.null(seed)) set.seed(seed)
     scaledMat = scaleCountMat(countMat)
-    keep = apply(scaledMat, 2, var) > 0
-    keep = keep & !is.na(keep)
+    keep = varyingColumns(scaledMat)
     scaledMat = scaledMat[, keep, drop = FALSE]
     classes = sort(unique(labels))
     # stratified folds: the cells of each class, shuffled, are dealt round the folds in turn, so a class of
