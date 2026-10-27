@@ -37,6 +37,8 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
             ". Drop or merge these cell types.", call. = FALSE)
     }
     if (is.null(colnames(countMat))) colnames(countMat) = paste0("gene", seq_len(ncol(countMat)))
+    blasThreads = setBlasThreads(1L)
+    on.exit(setBlasThreads(blasThreads), add = TRUE)
     if (!is.null(seed)) set.seed(seed)
     scaledMat = scaleCountMat(countMat)
     keep = apply(scaledMat, 2, var) > 0

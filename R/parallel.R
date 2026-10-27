@@ -53,3 +53,14 @@ parLapply = function(X, FUN, BPPARAM) {
     names(out) = names(X)
     out
 }
+
+# Sets the number of BLAS threads and returns the previous number. The
+# classifiers multiply thin matrices (cells x genes by genes x 50 or fewer), for
+# which OpenBLAS's threads (one per core) cost far more than they save: on a
+# 128-core server a 40,000-cell lineage took 609 s with 128 threads and 343 s
+# with one, serially. Workers forked meanwhile inherit the one thread.
+setBlasThreads = function(n) {
+    old = RhpcBLASctl::blas_get_num_procs()
+    if (!identical(as.integer(old), as.integer(n))) RhpcBLASctl::blas_set_num_threads(n)
+    old
+}

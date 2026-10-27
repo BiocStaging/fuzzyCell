@@ -334,3 +334,19 @@ test_that("crossfitClassify rejects singleton classes and impossible fold counts
         expect_error(crossfitClassify(d$counts, d$labels, nFolds = k), "`nFolds` must be")
     }
 })
+
+test_that("the classifiers run BLAS on one thread and restore the session's setting", {
+    before = RhpcBLASctl::blas_get_num_procs()
+    on.exit(RhpcBLASctl::blas_set_num_threads(before))
+    RhpcBLASctl::blas_set_num_threads(2L)
+    d = makeCounts()
+    seen = NULL
+    predict = predictClassifierClass
+    local_mocked_bindings(predictClassifierClass = function(...) {
+        seen <<- c(seen, RhpcBLASctl::blas_get_num_procs())
+        predict(...)
+    })
+    suppressMessages(bootstrapClassify(d$counts, d$labels, nBoot = 2, seed = 1))
+    expect_true(length(seen) > 0 && all(seen == 1L))
+    expect_equal(RhpcBLASctl::blas_get_num_procs(), 2L)
+})

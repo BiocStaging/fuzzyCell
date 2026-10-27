@@ -18,7 +18,8 @@
   same draws as before).
 * Parallel loops (the bootstrap resamples, the random forest and the cross-fitting folds) run as in spicyR and
   lisaClust: the workers are forked once per call and run BLAS on one thread, and tasks are handed out in about
-  eight chunks per worker. Results are unchanged.
+  eight chunks per worker. The bootstrap and cross-fitting run BLAS on one thread throughout, serially too.
+  Results are unchanged.
 * `correctedCounts = TRUE` in `bootstrapClassify()` and `bootstrapLineageConfidence()` accepts counts that are not
   whole numbers, such as counts corrected for ambient RNA, and resamples them as they are; they must still be on
   the scale of molecule counts. By default counts must be whole numbers, as before.

@@ -209,6 +209,8 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, core
             ". Drop or merge these cell types.", call. = FALSE)
     }
 
+    blasThreads = setBlasThreads(1L)
+    on.exit(setBlasThreads(blasThreads), add = TRUE)
     scaledMat = scaleCountMat(countMat)
     if (!is.null(seed)) set.seed(seed)
 
