@@ -617,8 +617,8 @@ metricBoxplotGG = function(results, cells, fromType, toType, outcomeCol, metric)
     outcomeDat = dplyr::distinct(cells, imageID, .data[[outcomeCol]])
 
     plotDat = dplyr::inner_join(
-        source$unweighted |> dplyr::select(imageID, from, to, value = .data[[source$valueCol]]),
-        source$weighted |> dplyr::select(imageID, from, to, weightedValue = .data[[source$valueCol]]),
+        source$unweighted |> dplyr::select(imageID, from, to, value = dplyr::all_of(source$valueCol)),
+        source$weighted |> dplyr::select(imageID, from, to, weightedValue = dplyr::all_of(source$valueCol)),
         by = c("imageID", "from", "to")
     ) |>
         dplyr::filter(from == fromType, to == toType) |>
