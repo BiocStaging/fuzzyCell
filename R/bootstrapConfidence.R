@@ -1,6 +1,6 @@
 # Train the chosen classifier on a (already scaled/subset) feature matrix. 
 # ntree only applies to classifier = "rf".
-# A random forest is grown as 25 sub-forests on the workers of BPPARAM and merged
+# A random forest is grown as 25 sub-forests on the workers of BPPARAM (from parallelParam()) and merged
 # with randomForest::combine(); the number of sub-forests does not depend on the
 # number of workers, so the forest does not either.
 trainClassifier = function(x, y, classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"), ntree = 500,
@@ -28,8 +28,7 @@ trainClassifier = function(x, y, classifier = c("pcaLogistic", "logistic", "rf",
     }
     if (classifier == "rf") {
         sizes = diff(round(seq(0, ntree, length.out = min(25, ntree) + 1)))
-        forests = BiocParallel::bplapply(sizes, function(nt) randomForest::randomForest(x, y, ntree = nt),
-            BPPARAM = BPPARAM)
+        forests = parLapply(sizes, function(nt) randomForest::randomForest(x, y, ntree = nt), BPPARAM)
         return(do.call(randomForest::combine, forests))
     }
     switch(classifier,
@@ -233,27 +232,23 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, core
             "matrix of counts.", call. = FALSE)
     }
     keep = keep & !is.na(keep)
-    BPPARAM = if (cores > 1 && .Platform$OS.type != "windows") BiocParallel::MulticoreParam(cores) else BiocParallel::SerialParam()
     # the forest's own random streams, apart from those of the resamples below
-    if (!is.null(seed)) BiocParallel::bpRNGseed(BPPARAM) = seed + 7919L
     fit = trainClassifier(scaledMat[balancedIdx, keep, drop = FALSE], labels[balancedIdx], classifier, ntree = ntree,
-        BPPARAM = BPPARAM)
+        BPPARAM = parallelParam(cores, if (!is.null(seed)) seed + 7919L))
     message("Finished training classifier.")
 
 
-    # plain set.seed() before bplapply() does NOT make forked MulticoreParam
-    # workers reproducible - the seed has to be set on the BPPARAM itself. Each
-    # resample gets its own random stream, so results do not depend on the
-    # number of workers.
-    if (!is.null(seed)) BiocParallel::bpRNGseed(BPPARAM) = seed
+    # plain set.seed() does NOT make forked workers reproducible - the seed is
+    # set on the param itself. Each resample gets its own random stream, so
+    # results do not depend on the number of workers.
 
     # observed priors: the classes' shares among these cells
     logPrior = if (priors == "observed") log(c(table(labels)) / length(labels))
     layout = resampleLayout(countMat)
-    preds = BiocParallel::bplapply(seq_len(nBoot), function(b) {
+    preds = parLapply(seq_len(nBoot), function(b) {
         bootMat = resampleCounts(layout)
         predictClassifierClass(fit, scaleCountMat(bootMat)[, keep, drop = FALSE], classifier, logPrior)
-    }, BPPARAM = BPPARAM)
+    }, parallelParam(cores, seed))
 
     predMatrix = do.call(cbind, preds)
 

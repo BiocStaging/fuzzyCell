@@ -54,7 +54,7 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
     out = matrix(NA_real_, length(labels), length(classes), dimnames = list(NULL, classes))
     # one fold per task; each draws its balanced training set from its own random stream
     seeds = sample.int(.Machine$integer.max, nFolds)
-    fits = BiocParallel::bplapply(seq_len(nFolds), function(k) {
+    fits = parLapply(seq_len(nFolds), function(k) {
         set.seed(seeds[k])
         train = which(fold != k)
         sizes = table(labels[train])
@@ -66,7 +66,7 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
         fit = trainClassifier(scaledMat[balancedIdx, , drop = FALSE], labels[balancedIdx], classifier, ntree = ntree)
         test = which(fold == k)
         list(test = test, p = predictClassifierProb(fit, scaledMat[test, , drop = FALSE], classifier))
-    }, BPPARAM = BPPARAM)
+    }, BPPARAM)
     for (f in fits) out[f$test, colnames(f$p)] = f$p
     out[is.na(out)] = 0
     if (priors == "observed") {
@@ -116,7 +116,7 @@ crossfitLineageProbabilities = function(spe, cellTypeTree, nFolds = 5, nPerClass
     classifier = match.arg(classifier)
     priors = match.arg(priors)
     checkCores(cores)
-    BPPARAM = if (cores > 1 && .Platform$OS.type != "windows") BiocParallel::MulticoreParam(cores) else BiocParallel::SerialParam()
+    BPPARAM = parallelParam(cores)
     checkSpe(spe)
     checkColumn(spe, cellType, "cellType")
     checkColumn(spe, cellID, "cellID")

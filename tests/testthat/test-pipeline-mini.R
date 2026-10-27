@@ -48,3 +48,22 @@ test_that("results do not depend on the number of cores", {
         quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome", cores = 1)),
         quiet(runColocalisationModels(d$spe, d$tree, d$conf, "outcome", cores = 2)))
 })
+
+test_that("the random forest does not depend on the number of cores", {
+    skip_on_os("windows")
+    expect_equal(
+        quiet(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 3, seed = 1, classifier = "rf", ntree = 50,
+            cores = 1)),
+        quiet(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 3, seed = 1, classifier = "rf", ntree = 50,
+            cores = 3)))
+})
+
+test_that("parallel workers run BLAS on one thread, and the session's setting is restored", {
+    skip_on_os("windows")
+    before = RhpcBLASctl::blas_get_num_procs()
+    on.exit(RhpcBLASctl::blas_set_num_threads(before))
+    RhpcBLASctl::blas_set_num_threads(2L)
+    inWorkers = unlist(parLapply(1:4, function(i) RhpcBLASctl::blas_get_num_procs(), parallelParam(2)))
+    expect_true(all(inWorkers == 1L))
+    expect_equal(RhpcBLASctl::blas_get_num_procs(), 2L)
+})

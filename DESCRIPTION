@@ -38,6 +38,7 @@ Imports:
     methods,
     pheatmap,
     randomForest,
+    RhpcBLASctl,
     rlang,
     SpatialExperiment,
     spicyR (>= 1.99.32),
