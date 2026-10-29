@@ -42,12 +42,9 @@ cell has weight 1 for its own cell type. A group's column is 1 for each of its
 cells, since the bootstrap reclassifies cells only within their group.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-    seed = 1)
-w = confidenceWeights(spe, heartCellTypeTree, confList)
-head(w[, c("vSMCs", "Pericytes", "Vascular")])
-}
+data(lungSubset)
+data(lungCellTypeTree)
+data(lungConfList)
+w = confidenceWeights(lungSubset, lungCellTypeTree, lungConfList)
+head(w[, c("Arteriole", "Venous", "Endothelial lineage")])
 }

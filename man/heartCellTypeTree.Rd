@@ -11,7 +11,7 @@ A nested list; see \link{cellTypeTree}.
 Defined in \code{data-raw/heartCellTypeTree.R}.
 }
 \usage{
-heartCellTypeTree
+data(heartCellTypeTree)
 }
 \description{
 The cell type hierarchy used with \code{\link[=loadAmancherla]{loadAmancherla()}}: broad lineages, groups

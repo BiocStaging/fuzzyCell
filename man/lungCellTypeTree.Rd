@@ -11,7 +11,7 @@ A nested list; see \link{cellTypeTree}.
 Defined in \code{data-raw/lungCellTypeTree.R}.
 }
 \usage{
-lungCellTypeTree
+data(lungCellTypeTree)
 }
 \description{
 The cell type hierarchy for \link{lungSubset} (and the full

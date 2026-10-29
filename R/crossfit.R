@@ -39,7 +39,7 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
     if (is.null(colnames(countMat))) colnames(countMat) = paste0("gene", seq_len(ncol(countMat)))
     blasThreads = setBlasThreads(1L)
     on.exit(setBlasThreads(blasThreads), add = TRUE)
-    if (!is.null(seed)) set.seed(seed)
+    localSeed(seed)
     scaledMat = scaleCountMat(countMat)
     keep = varyingColumns(scaledMat)
     scaledMat = scaledMat[, keep, drop = FALSE]
@@ -56,7 +56,7 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
     # one fold per task; each draws its balanced training set from its own random stream
     seeds = sample.int(.Machine$integer.max, nFolds)
     fits = parLapply(seq_len(nFolds), function(k) {
-        set.seed(seeds[k])
+        localSeed(seeds[k])
         train = which(fold != k)
         sizes = table(labels[train])
         targetSize = max(min(sizes), nPerClass)
@@ -102,12 +102,11 @@ crossfitClassify = function(countMat, labels, nFolds = 5, nPerClass = 50, seed =
 #'   with probabilities in place of bootstrap confidences.
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' probList = crossfitLineageProbabilities(spe, heartCellTypeTree, seed = 1)
-#' head(probList[["Vascular"]])
-#' }
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' probList = crossfitLineageProbabilities(lungSubset, lungCellTypeTree,
+#'     nFolds = 3, seed = 1)
+#' head(probList[["Endothelial lineage"]])
 #' @export
 crossfitLineageProbabilities = function(spe, cellTypeTree, nFolds = 5, nPerClass = 50, seed = 51773,
                                         classifier = c("pcaLogistic", "logistic", "rf", "lda"), ntree = 500,

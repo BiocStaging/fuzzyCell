@@ -101,12 +101,12 @@ the \code{confList} used by the downstream analyses, such as
 group (ungrouped leaves) are not refined and keep hard labels.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
+data(lungSubset)
+data(lungCellTypeTree)
+confList = bootstrapLineageConfidence(lungSubset, lungCellTypeTree, nBoot = 5,
     seed = 1)
 names(confList)
-head(confList[["T cells"]])
-}
+head(confList[["Endothelial lineage"]])
+
+# the same call with nBoot = 20 gives the confidences in `lungConfList`
 }

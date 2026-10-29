@@ -45,15 +45,12 @@ clusterNiches = function(lisaMat, k, ...) {
 #'   `nicheWeighted`.
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
-#' niches = runNicheIdentification(spe, heartCellTypeTree, confList,
-#'     r = c(20, 50), k = 5)
-#' table(niches$nicheWeighted)
-#' }
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' niches = runNicheIdentification(lungSubset, lungCellTypeTree, lungConfList,
+#'     r = 50, k = 6)
+#' table(weighted = niches$nicheWeighted, unweighted = niches$nicheUnweighted)
 #' @name nicheIdentification
 #' @export
 runNicheIdentification = function(spe, cellTypeTree, confList, toLabels = NULL, r = c(20, 50, 100),
@@ -92,10 +89,12 @@ runNicheIdentification = function(spe, cellTypeTree, confList, toLabels = NULL, 
     # the same seed for both clusterings, so that they differ only through the
     # features and not through different random starts
     message("Clustering niches...")
-    if (!is.null(seed)) set.seed(seed)
-    nicheUnweighted = clusterNiches(lisaMat$unweighted, k = k)
-    if (!is.null(seed)) set.seed(seed)
-    nicheWeighted = clusterNiches(lisaMat$weighted, k = k)
+    cluster = function(mat) {
+        localSeed(seed)
+        clusterNiches(mat, k = k)
+    }
+    nicheUnweighted = cluster(lisaMat$unweighted)
+    nicheWeighted = cluster(lisaMat$weighted)
 
     list(
         lisaMatUnweighted = lisaMat$unweighted, lisaMatWeighted = lisaMat$weighted,
@@ -139,18 +138,14 @@ runNicheIdentification = function(spe, cellTypeTree, confList, toLabels = NULL, 
 #'   pass to [nicheProportionBoxplot()]).
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
-#' niches = runNicheIdentification(spe, heartCellTypeTree, confList,
-#'     r = c(20, 50), k = 5)
-#' res = testNicheOutcome(spe, niches$nicheUnweighted,
-#'     niches$nicheWeighted, outcomeCol = "resolution_broad",
-#'     subject = "subject")
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' niches = runNicheIdentification(lungSubset, lungCellTypeTree, lungConfList,
+#'     r = 50, k = 6)
+#' res = testNicheOutcome(lungSubset, niches$nicheUnweighted,
+#'     niches$nicheWeighted, outcomeCol = "disease_status", subject = "subject")
 #' res$testWeighted
-#' }
 #' @export
 testNicheOutcome = function(spe, nicheUnweighted, nicheWeighted, outcomeCol,
                              test = c("wilcox", "ttest"), subject = NULL,

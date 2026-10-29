@@ -19,8 +19,6 @@ the coordinates are added as columns \code{x} and \code{y}. The spatial function
 fuzzyCell expect \code{cellID}, \code{imageID}, \code{cellType}, \code{x} and \code{y} columns.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-head(getCellData(spe))
-}
+data(lungSubset)
+head(getCellData(lungSubset))
 }

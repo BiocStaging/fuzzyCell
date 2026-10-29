@@ -134,12 +134,11 @@ imageModelTable = function(res, pairs = NULL) {
 #'
 #' @examples
 #' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
-#' res = runColocalisationModels(spe, heartCellTypeTree, confList,
-#'     outcomeCol = "resolution_broad", subject = "subject")
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' res = runColocalisationModels(lungSubset, lungCellTypeTree, lungConfList,
+#'     outcomeCol = "disease_status", subject = "subject")
 #' head(res$modelWeighted)
 #' }
 #' @export

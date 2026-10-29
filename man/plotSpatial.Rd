@@ -78,18 +78,18 @@ Plots the cells of one image, highlighting a cell type or group, or showing
 bootstrap confidence scores.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-    seed = 1)
-img = unique(spe$imageID)[1]
-plotHardSpatialPair(spe, img, "CD8+ T cells", "Macrophages",
-    heartCellTypeTree)
-plotWeightedSpatial(spe, heartCellTypeTree, confList, img, "T cells",
-    "CD8+ T cells")
-plotOriginalLabelSpatial(spe, heartCellTypeTree, img, "T cells")
-plotWeightedSpatialPair(spe, heartCellTypeTree, confList, img,
-    "T cells", "CD8+ T cells", "Macrophage lineage", "Macrophages")
+data(lungSubset)
+data(lungCellTypeTree)
+data(lungConfList)
+plotHardSpatialPair(lungSubset, "VUHD113", "Mast", "Proliferating FBs",
+    lungCellTypeTree)
+plotWeightedSpatial(lungSubset, lungCellTypeTree, lungConfList, "VUHD113",
+    "Endothelial lineage", "Arteriole")
+plotOriginalLabelSpatial(lungSubset, lungCellTypeTree, "VUHD113",
+    "Endothelial lineage")
+if (requireNamespace("ggnewscale", quietly = TRUE)) {
+    plotWeightedSpatialPair(lungSubset, lungCellTypeTree, lungConfList,
+        "VUHD113", "Granulocytes", "Mast", "Fibroblast lineage",
+        "Proliferating FBs")
 }
 }

@@ -57,16 +57,12 @@ location. Each image is one observation, so every image must come from a
 different subject if \code{subject} is given.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-    seed = 1)
-niches = runNicheIdentification(spe, heartCellTypeTree, confList,
-    r = c(20, 50), k = 5)
-res = testNicheOutcome(spe, niches$nicheUnweighted,
-    niches$nicheWeighted, outcomeCol = "resolution_broad",
-    subject = "subject")
+data(lungSubset)
+data(lungCellTypeTree)
+data(lungConfList)
+niches = runNicheIdentification(lungSubset, lungCellTypeTree, lungConfList,
+    r = 50, k = 6)
+res = testNicheOutcome(lungSubset, niches$nicheUnweighted,
+    niches$nicheWeighted, outcomeCol = "disease_status", subject = "subject")
 res$testWeighted
-}
 }

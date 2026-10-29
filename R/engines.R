@@ -18,14 +18,11 @@
 #'   named column per leaf cell type and group.
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
-#' w = confidenceWeights(spe, heartCellTypeTree, confList)
-#' head(w[, c("vSMCs", "Pericytes", "Vascular")])
-#' }
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' w = confidenceWeights(lungSubset, lungCellTypeTree, lungConfList)
+#' head(w[, c("Arteriole", "Venous", "Endothelial lineage")])
 #' @export
 confidenceWeights = function(spe, cellTypeTree, confList, weighted = TRUE,
                              cellType = "cellType", cellID = "cellID") {

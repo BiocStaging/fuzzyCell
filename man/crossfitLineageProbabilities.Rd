@@ -72,10 +72,9 @@ the classes are balanced in training, the probabilities give every child cell
 type the same prior weight.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-probList = crossfitLineageProbabilities(spe, heartCellTypeTree, seed = 1)
-head(probList[["Vascular"]])
-}
+data(lungSubset)
+data(lungCellTypeTree)
+probList = crossfitLineageProbabilities(lungSubset, lungCellTypeTree,
+    nFolds = 3, seed = 1)
+head(probList[["Endothelial lineage"]])
 }

@@ -45,7 +45,7 @@ loadAmancherla = function(timing = c("pre", "post", "both"), seed = 51773) {
 
     # one image per patient: a random cell is drawn per patient and its image
     # kept. Pre is drawn before post so each timing's choice is reproducible.
-    set.seed(seed)
+    localSeed(seed)
     pickImages = function(speTiming) {
         colData(speTiming) |>
             as.data.frame() |>
@@ -125,3 +125,22 @@ loadAmancherla = function(timing = c("pre", "post", "both"), seed = 51773) {
 #' @docType data
 #' @keywords datasets
 "lungCellTypeTree"
+
+#' Bootstrap confidences for the lung data
+#'
+#' The bootstrap classification confidences of the cells in [lungSubset], from
+#' `bootstrapLineageConfidence(lungSubset, lungCellTypeTree, nBoot = 20,
+#' classifier = "pcaLogistic", seed = 1)`, so that the examples can skip the
+#' bootstrap.
+#'
+#' @format A named list with one data frame per group of [lungCellTypeTree]
+#'   (see [bootstrapLineageConfidence()] for the format).
+#' @source Built by `data-raw/lungConfList.R`.
+#' @examples
+#' data(lungConfList)
+#' names(lungConfList)
+#' head(lungConfList[["Endothelial lineage"]])
+#' @name lungConfList
+#' @docType data
+#' @keywords datasets
+"lungConfList"

@@ -38,7 +38,9 @@ The rest of this vignette follows the workflow on a real dataset.
 
 # Installation
 
-```{r install, eval = FALSE}
+```{r}
+#| label: install
+#| eval: false
 if (!requireNamespace("BiocManager", quietly = TRUE)) {
     install.packages("BiocManager")
 }
@@ -49,7 +51,8 @@ BiocManager::install("fuzzyCell")
 
 We follow the whole workflow on Xenium lung biopsies from patients with pulmonary fibrosis and from controls (Vannan et al., 2025). The full data are available as `SpatialDatasets::spe_Vannan_2025()`. The package includes a small subset, `lungSubset`: five control and five disease biopsies, each cropped to a window of about 3,000 cells at its centre. Every image comes from a different patient, and `disease_status` records whether the patient is a control or has pulmonary fibrosis.
 
-```{r data}
+```{r}
+#| label: data
 library(fuzzyCell)
 library(SpatialExperiment)
 library(ggplot2)
@@ -72,7 +75,8 @@ Any `SummarizedExperiment` (such as a `SpatialExperiment`) works as long as it h
 
 Confidence scores are estimated only between closely related cell types, so *fuzzyCell* requires a hierarchy specifying which subtypes may be confused with one another. The hierarchy is supplied as a nested list. A group of subtypes to be refined together is specified as `list(children = ...)`; every other entry is either an organisational level (such as the lineage `"Immune"`) or a leaf cell type that is not refined (such as `"SMCs/Pericytes"`). Each top-level entry must be named. The cell type tree for the lung data is defined as follows:
 
-```{r tree}
+```{r}
+#| label: tree
 tree = list(
     "Immune" = list(
         "Myeloid" = list(
@@ -115,21 +119,28 @@ The classifier is trained with the same number of cells of each subtype, which g
 
 We use 20 resamples to keep the vignette quick, but we encourage at least 100 for your own analysis.
 
-```{r bootstrap, results = "hide"}
+```{r}
+#| label: bootstrap
+#| results: hide
 confList = bootstrapLineageConfidence(spe, tree, nBoot = 20, classifier = "pcaLogistic",
     seed = 1)
 ```
 
 The result, `confList`, is a list with one data frame per group. Each data frame has one row per cell in the group, a `cellID` column, and one column per subtype holding that cell's confidence in it (between 0 and 1, adding up to 1 across the subtypes):
 
-```{r confhead}
+```{r}
+#| label: confhead
 names(confList)
 head(confList[["Endothelial lineage"]])
 ```
 
 How spread out are the confidences? Here are the scores for the subtypes of two groups, the B lineage and the endothelial cells.
 
-```{r confplot, fig.height = 6, fig.width = 6, fig.alt = "Histograms of each subtype's confidence scores, for the B lineage and the endothelial cells."}
+```{r}
+#| label: confplot
+#| fig-height: 6
+#| fig-width: 6
+#| fig-alt: "Histograms of each subtype's confidence scores, for the B lineage and the endothelial cells."
 groups = c("B lineage", "Endothelial lineage")
 scores = do.call(rbind, lapply(groups, function(g) {
     conf = confList[[g]]
@@ -153,19 +164,23 @@ It takes as input the `SpatialExperiment` (`spe`), the cell type tree and the co
 
 In the results, `estimate` is the difference in proportion for the second level of the outcome relative to the first (alphabetical order for text, factor order for factors); here that is `Disease` minus `Control`. `p.adj` is the Benjamini-Hochberg adjusted p-value across the cell types tested.
 
-```{r props, results = "hide"}
+```{r}
+#| label: props
+#| results: hide
 props = runProportionsPipeline(spe, tree, confList,
     outcomeCol = "disease_status", subject = "subject")
 ```
 
-```{r propstables}
+```{r}
+#| label: propstables
 head(props$modelWeighted)
 head(props$modelUnweighted)
 ```
 
 For most cell types the weighted and unweighted analyses agree. Arterioles are one where they do not: with the original labels their proportion does not differ clearly between the outcomes, but with the confidences it is lower in disease.
 
-```{r propscompare}
+```{r}
+#| label: propscompare
 cols = c("cellType", "estimate", "p.value", "p.adj")
 rbind(
     unweighted = subset(props$modelUnweighted, cellType == "Arteriole")[, cols],
@@ -174,7 +189,10 @@ rbind(
 
 We can use `plotProportionBoxplot()` to visualise the per-patient proportions behind a cell type's estimate.
 
-```{r propsplot, fig.height = 4, fig.width = 5}
+```{r}
+#| label: propsplot
+#| fig-height: 4
+#| fig-width: 5
 plotProportionBoxplot(props, "Arteriole", spe, "disease_status")
 ```
 
@@ -182,7 +200,10 @@ The plot is interactive: hovering over a point tells you which sample it is, so 
 
 `plotOriginalLabelSpatial()` shows the endothelial cells of the image with their hard labels, and `plotWeightedSpatial()` shows the same cells coloured by their confidence of being arterioles.
 
-```{r imgplots, fig.height = 4, fig.width = 6}
+```{r}
+#| label: imgplots
+#| fig-height: 4
+#| fig-width: 6
 # the endothelial lineage with its original labels
 plotOriginalLabelSpatial(spe, tree, "VUHD113", "Endothelial lineage")
 
@@ -192,11 +213,16 @@ plotWeightedSpatial(spe, tree, confList, "VUHD113", "Endothelial lineage", "Arte
 
 Marker expression helps to judge whether the confidences are sensible. Here is the arterial marker `HEY1` in the endothelial cells of this image:
 
-```{r imgmarkers, fig.height = 4, fig.width = 6}
+```{r}
+#| label: imgmarkers
+#| fig-height: 4
+#| fig-width: 6
 plotOneMarkerSpatial(spe, "VUHD113", "Endothelial lineage", "HEY1", cellTypeTree = tree)
 ```
 
-```{r hey1, echo = FALSE}
+```{r}
+#| label: hey1
+#| echo: false
 endo = confList[["Endothelial lineage"]]
 endo = endo[endo$cellID %in% spe$cellID[spe$imageID == "VUHD113"], ]
 hey1 = counts(spe)["HEY1", endo$cellID] > 0
@@ -212,7 +238,9 @@ HEY1 expression is concentrated in the same vessels as the cells with high arter
 
 The proportion of a subtype among all cells can change simply because its whole group changes. `runProportionsRelativeToParentPipeline()` instead models each subtype as a proportion of its group (for example, AT2 cells among all alveolar epithelial cells). It takes the same inputs as `runProportionsPipeline()` and returns weighted and unweighted models in the same format:
 
-```{r relprops, eval = FALSE}
+```{r}
+#| label: relprops
+#| eval: false
 relProps = runProportionsRelativeToParentPipeline(spe, tree, confList,
     outcomeCol = "disease_status", subject = "subject")
 ```
@@ -225,28 +253,37 @@ For an ordered pair `from` → `to`, co-localisation in each image is quantified
 
 The confidence weights themselves are returned by `confidenceWeights()` as a matrix with one column per cell type and group, and can be passed directly to spicyR and lisaClust through their `cellWeights` argument.
 
-```{r coloc, results = "hide"}
+```{r}
+#| label: coloc
+#| results: hide
 coloc = runColocalisationModels(spe, tree, confList,
     outcomeCol = "disease_status", subject = "subject", r = 50)
 ```
 
 The weighted and unweighted results are returned together. Mast cells and proliferating fibroblasts are a pair where they disagree: with the original labels their co-localisation does not differ significantly between the outcomes, while with the confidences it is lower in disease.
 
-```{r colocresults}
+```{r}
+#| label: colocresults
 subset(coloc$modelUnweighted, from == "Mast" & to == "Proliferating FBs")
 subset(coloc$modelWeighted, from == "Mast" & to == "Proliferating FBs")
 ```
 
 `plotMetricBoxplot()` shows the per-image values behind the pair:
 
-```{r colocplot, fig.height = 4, fig.width = 5}
+```{r}
+#| label: colocplot
+#| fig-height: 4
+#| fig-width: 5
 plotMetricBoxplot(coloc, spe, "Mast", "Proliferating FBs",
     "disease_status", metric = "lfunction")
 ```
 
 The difference is largely driven by the `Control` samples showing increased attraction after weighting. We can take a closer look at one such sample, `VUHD113`:
 
-```{r vuhd113plots, fig.height = 4.5, fig.width = 6.5}
+```{r}
+#| label: vuhd113plots
+#| fig-height: 4.5
+#| fig-width: 6.5
 # the two cell types with their original labels
 plotHardSpatialPair(spe, "VUHD113", "Mast", "Proliferating FBs", tree)
 
@@ -255,7 +292,9 @@ plotWeightedSpatialPair(spe, tree, confList, "VUHD113", "Granulocytes", "Mast",
     "Fibroblast lineage", "Proliferating FBs")
 ```
 
-```{r vuhd113, echo = FALSE}
+```{r}
+#| label: vuhd113
+#| echo: false
 img = spe$imageID == "VUHD113"
 xy = SpatialExperiment::spatialCoords(spe)[img, ]
 label = spe$cellType[img]
@@ -272,13 +311,18 @@ With the original labels, the image contains only `r sum(label == "Proliferating
 
 Niches are recurring local neighbourhoods: groups of cells that share a similar mix of surrounding cell types. `runNicheIdentification()` describes every cell by its local indicators of spatial association from lisaClust, at several radii, and clusters those profiles into `k` niches. It does this twice, with the hard labels and with the weights, in which each neighbour counts towards a cell type in proportion to its confidence.
 
-```{r niches, results = "hide"}
+```{r}
+#| label: niches
+#| results: hide
 niches = runNicheIdentification(spe, tree, confList, r = c(20, 50), k = 8)
 ```
 
 The niche plots take the niche assignments returned by `runNicheIdentification()`. `nicheCompositionMap()` shows which cell types are enriched in each niche, here for the unweighted (left) and weighted (right) niches:
 
-```{r nichemap, fig.height = 7, fig.width = 5.5}
+```{r}
+#| label: nichemap
+#| fig-height: 7
+#| fig-width: 5.5
 #| layout-ncol: 2
 nicheCompositionMap(spe, niches$nicheUnweighted)
 nicheCompositionMap(spe, niches$nicheWeighted)
@@ -288,7 +332,10 @@ Most niches have similar compositions with and without weights. The main excepti
 
 An alluvial plot, drawn here with the ggalluvial package, shows how cells move between the unweighted and weighted niches:
 
-```{r nichealluvial, fig.height = 5, fig.width = 6.5}
+```{r}
+#| label: nichealluvial
+#| fig-height: 5
+#| fig-width: 6.5
 library(ggalluvial)
 flows = as.data.frame(table(unweighted = niches$nicheUnweighted,
     weighted = niches$nicheWeighted), responseName = "cells")
@@ -301,7 +348,9 @@ ggplot(flows, aes(axis1 = unweighted, axis2 = weighted, y = cells)) +
     theme_minimal()
 ```
 
-```{r nichemoves, echo = FALSE}
+```{r}
+#| label: nichemoves
+#| echo: false
 moves = table(niches$nicheUnweighted, niches$nicheWeighted)
 share = function(from, to) paste0(round(100 * moves[from, to] / sum(moves[from, ])), "%")
 ```
@@ -310,13 +359,17 @@ The split of the alveolar niche is visible as flows of cells: the unweighted `ni
 
 `plotNicheSpatial()` shows where a niche's cells are in an image:
 
-```{r nichespatial, fig.height = 5, fig.width = 9}
+```{r}
+#| label: nichespatial
+#| fig-height: 5
+#| fig-width: 9
 plotNicheSpatial(spe, "VUHD038", "niche1", nicheCol = niches$nicheWeighted)
 ```
 
 The proportion of each niche can be tested against the outcome in the same way as the cell types:
 
-```{r nichetest}
+```{r}
+#| label: nichetest
 nicheTests = testNicheOutcome(spe, niches$nicheUnweighted,
     niches$nicheWeighted, outcomeCol = "disease_status", subject = "subject")
 nicheTests$testWeighted
@@ -341,6 +394,7 @@ A positive estimate means that the niche is more common in disease. Without weig
 
 # Session info
 
-```{r sessioninfo}
+```{r}
+#| label: sessioninfo
 sessionInfo()
 ```

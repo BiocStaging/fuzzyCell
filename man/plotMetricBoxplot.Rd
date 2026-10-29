@@ -41,17 +41,16 @@ one image.
 }
 \examples{
 \donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-    seed = 1)
+data(lungSubset)
+data(lungCellTypeTree)
+data(lungConfList)
+res = runColocalisationModels(lungSubset, lungCellTypeTree, lungConfList,
+    outcomeCol = "disease_status", subject = "subject")
 if (requireNamespace("ggiraph", quietly = TRUE)) {
-    res = runColocalisationModels(spe, heartCellTypeTree, confList,
-        outcomeCol = "resolution_broad", subject = "subject")
-    plotMetricBoxplot(res, spe, "CD8+ T cells", "Macrophages",
-        outcomeCol = "resolution_broad")
-    plotMetricBoxplot(res, spe, "CD8+ T cells", "Macrophages",
-        outcomeCol = "resolution_broad", metric = "kontextual")
+    plotMetricBoxplot(res, lungSubset, "Mast", "Proliferating FBs",
+        outcomeCol = "disease_status")
+    plotMetricBoxplot(res, lungSubset, "Mast", "Proliferating FBs",
+        outcomeCol = "disease_status", metric = "kontextual")
 }
 }
 }

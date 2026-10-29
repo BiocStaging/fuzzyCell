@@ -84,13 +84,10 @@ so that if the weights made no difference the two sets of niches would be
 identical.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-    seed = 1)
-niches = runNicheIdentification(spe, heartCellTypeTree, confList,
-    r = c(20, 50), k = 5)
-table(niches$nicheWeighted)
-}
+data(lungSubset)
+data(lungCellTypeTree)
+data(lungConfList)
+niches = runNicheIdentification(lungSubset, lungCellTypeTree, lungConfList,
+    r = 50, k = 6)
+table(weighted = niches$nicheWeighted, unweighted = niches$nicheUnweighted)
 }

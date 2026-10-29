@@ -32,19 +32,15 @@ the results of \code{\link[=runProportionsRelativeToParentPipeline]{runProportio
 of the parent group. Each point is one image.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-    seed = 1)
+data(lungSubset)
+data(lungCellTypeTree)
+data(lungConfList)
+res = runProportionsPipeline(lungSubset, lungCellTypeTree, lungConfList,
+    outcomeCol = "disease_status", subject = "subject")
+rel = runProportionsRelativeToParentPipeline(lungSubset, lungCellTypeTree,
+    lungConfList, outcomeCol = "disease_status", subject = "subject")
 if (requireNamespace("ggiraph", quietly = TRUE)) {
-    res = runProportionsPipeline(spe, heartCellTypeTree, confList,
-        outcomeCol = "resolution_broad", subject = "subject")
-    plotProportionBoxplot(res, "CD8+ T cells", spe, "resolution_broad")
-
-    rel = runProportionsRelativeToParentPipeline(spe, heartCellTypeTree,
-        confList, outcomeCol = "resolution_broad", subject = "subject")
-    plotProportionBoxplot(rel, "CD8+ T cells", spe, "resolution_broad")
-}
+    plotProportionBoxplot(res, "Arteriole", lungSubset, "disease_status")
+    plotProportionBoxplot(rel, "Arteriole", lungSubset, "disease_status")
 }
 }

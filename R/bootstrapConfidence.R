@@ -217,15 +217,11 @@ predictClassifierClass = function(fit, newx, classifier = c("pcaLogistic", "logi
 #'   `k`, so each row sums to 1.
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' cells = annotateCellTypeTree(getCellData(spe), heartCellTypeTree)
-#' idx = which(cells$group %in% "T cells")
-#' countMat = t(SummarizedExperiment::assay(spe, "counts")[, idx])
-#' freq = bootstrapClassify(countMat, cells$cellType[idx], nBoot = 10, seed = 1)
+#' data(lungSubset)
+#' endo = lungSubset$cellType %in% c("Arteriole", "Venous", "Capillary", "Lymphatic")
+#' countMat = t(as.matrix(SummarizedExperiment::assay(lungSubset, "counts")[, endo]))
+#' freq = bootstrapClassify(countMat, lungSubset$cellType[endo], nBoot = 5, seed = 1)
 #' head(freq)
-#' }
 #' @export
 bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, cores = 1,
                             seed = NULL, classifier = c("pcaLogistic", "logistic", "rf", "lda", "svm"), ntree = 500,
@@ -273,7 +269,7 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, core
     blasThreads = setBlasThreads(1L)
     on.exit(setBlasThreads(blasThreads), add = TRUE)
     scaledMat = scaleCountMat(countMat)
-    if (!is.null(seed)) set.seed(seed)
+    localSeed(seed)
 
     # balance classes for training: use every real cell in the rarest class,
     # falling back to nPerClass (upsampled with replacement) only when even
@@ -301,7 +297,7 @@ bootstrapClassify = function(countMat, labels, nBoot = 100, nPerClass = 50, core
     message("Finished training classifier.")
 
 
-    # plain set.seed() does NOT make forked workers reproducible - the seed is
+    # a seed set in the session does NOT make forked workers reproducible - the seed is
     # set on the param itself. Each resample gets its own random stream, so
     # results do not depend on the number of workers.
 
@@ -419,14 +415,14 @@ checkSubprocessInstall = function() {
 #'   `fuzzyCellVersion`).
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' confList = bootstrapLineageConfidence(lungSubset, lungCellTypeTree, nBoot = 5,
 #'     seed = 1)
 #' names(confList)
-#' head(confList[["T cells"]])
-#' }
+#' head(confList[["Endothelial lineage"]])
+#'
+#' # the same call with nBoot = 20 gives the confidences in `lungConfList`
 #' @export
 bootstrapLineageConfidence = function(spe, cellTypeTree, nBoot = 100, nPerClass = 50,
                                        cores = 1, seed = 51773,

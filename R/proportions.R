@@ -160,15 +160,12 @@ runWeightedProportions = function(cells, cellTypeTree, confList, skipGroups = ch
 #'   difference for the second level of the outcome compared with the first).
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
-#' res = runProportionsPipeline(spe, heartCellTypeTree, confList,
-#'     outcomeCol = "resolution_broad", subject = "subject")
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' res = runProportionsPipeline(lungSubset, lungCellTypeTree, lungConfList,
+#'     outcomeCol = "disease_status", subject = "subject")
 #' head(res$modelWeighted)
-#' }
 #' @export
 runProportionsPipeline = function(spe, cellTypeTree, confList, outcomeCol, skipGroups = character(0),
                                   subject = NULL, cellType = "cellType", cellID = "cellID",
@@ -293,15 +290,12 @@ calcProportionsRelativeToParent = function(cells, cellTypeTree, confList, skipGr
 }
 
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
-#' rel = runProportionsRelativeToParentPipeline(spe, heartCellTypeTree,
-#'     confList, outcomeCol = "resolution_broad", subject = "subject")
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' rel = runProportionsRelativeToParentPipeline(lungSubset, lungCellTypeTree,
+#'     lungConfList, outcomeCol = "disease_status", subject = "subject")
 #' head(rel$modelWeighted)
-#' }
 #' @rdname runProportionsPipeline
 #' @export
 runProportionsRelativeToParentPipeline = function(spe, cellTypeTree, confList, outcomeCol,

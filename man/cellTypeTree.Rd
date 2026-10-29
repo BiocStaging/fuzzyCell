@@ -95,14 +95,12 @@ on a parent that is broader than a cell type's own group (see
 those parents automatically.
 }
 \examples{
-data(heartCellTypeTree)
-buildCellTypeMap(heartCellTypeTree)
-resolveTreeLeaves(heartCellTypeTree, "Immune")
-autoParentOverrides(heartCellTypeTree)
+data(lungCellTypeTree)
+buildCellTypeMap(lungCellTypeTree)
+resolveTreeLeaves(lungCellTypeTree, "Immune")
+autoParentOverrides(lungCellTypeTree)
 
-\donttest{
-spe = loadAmancherla("pre")
-cells = annotateCellTypeTree(getCellData(spe), heartCellTypeTree)
+data(lungSubset)
+cells = annotateCellTypeTree(getCellData(lungSubset), lungCellTypeTree)
 table(cells$group, useNA = "ifany")
-}
 }

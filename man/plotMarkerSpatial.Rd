@@ -61,13 +61,11 @@ Plots one image, with the cells of a group shaded by the (library-size
 normalised, rescaled) expression of one or two markers.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-img = unique(spe$imageID)[1]
-plotOneMarkerSpatial(spe, img, "T cells", "CD3E",
-    cellTypeTree = heartCellTypeTree)
-plotTwoMarkerSpatial(spe, img, "T cells", "CD3E", "purple",
-    "Macrophage lineage", "CD68", "green", cellTypeTree = heartCellTypeTree)
-}
+data(lungSubset)
+data(lungCellTypeTree)
+plotOneMarkerSpatial(lungSubset, "VUHD113", "Endothelial lineage", "HEY1",
+    cellTypeTree = lungCellTypeTree)
+plotTwoMarkerSpatial(lungSubset, "VUHD113", "Endothelial lineage", "PECAM1",
+    "purple", "Fibroblast lineage", "COL1A1", "green",
+    cellTypeTree = lungCellTypeTree)
 }

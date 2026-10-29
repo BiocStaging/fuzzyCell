@@ -21,7 +21,7 @@ Built from \code{SpatialDatasets::spe_Vannan_2025()} by
 \code{data-raw/lungSubset.R}.
 }
 \usage{
-lungSubset
+data(lungSubset)
 }
 \description{
 Xenium data of lung biopsies from Vannan et al. (2025), available in full as

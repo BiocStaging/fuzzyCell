@@ -82,19 +82,19 @@ getTwoLineageWeightDF = function(speSub, confList, groupA, subtypeA, groupB, sub
 #' @return A `ggplot` object.
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
-#' img = unique(spe$imageID)[1]
-#' plotHardSpatialPair(spe, img, "CD8+ T cells", "Macrophages",
-#'     heartCellTypeTree)
-#' plotWeightedSpatial(spe, heartCellTypeTree, confList, img, "T cells",
-#'     "CD8+ T cells")
-#' plotOriginalLabelSpatial(spe, heartCellTypeTree, img, "T cells")
-#' plotWeightedSpatialPair(spe, heartCellTypeTree, confList, img,
-#'     "T cells", "CD8+ T cells", "Macrophage lineage", "Macrophages")
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' plotHardSpatialPair(lungSubset, "VUHD113", "Mast", "Proliferating FBs",
+#'     lungCellTypeTree)
+#' plotWeightedSpatial(lungSubset, lungCellTypeTree, lungConfList, "VUHD113",
+#'     "Endothelial lineage", "Arteriole")
+#' plotOriginalLabelSpatial(lungSubset, lungCellTypeTree, "VUHD113",
+#'     "Endothelial lineage")
+#' if (requireNamespace("ggnewscale", quietly = TRUE)) {
+#'     plotWeightedSpatialPair(lungSubset, lungCellTypeTree, lungConfList,
+#'         "VUHD113", "Granulocytes", "Mast", "Fibroblast lineage",
+#'         "Proliferating FBs")
 #' }
 #' @param cellSize Size of the highlighted cells, the ones drawn in colour. The
 #'   grey background cells always have size 0.7.
@@ -313,15 +313,13 @@ plotOriginalLabelSpatial = function(spe, cellTypeTree, imageID, targetGroup, cel
 #' @return A `ggplot` object.
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' img = unique(spe$imageID)[1]
-#' plotOneMarkerSpatial(spe, img, "T cells", "CD3E",
-#'     cellTypeTree = heartCellTypeTree)
-#' plotTwoMarkerSpatial(spe, img, "T cells", "CD3E", "purple",
-#'     "Macrophage lineage", "CD68", "green", cellTypeTree = heartCellTypeTree)
-#' }
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' plotOneMarkerSpatial(lungSubset, "VUHD113", "Endothelial lineage", "HEY1",
+#'     cellTypeTree = lungCellTypeTree)
+#' plotTwoMarkerSpatial(lungSubset, "VUHD113", "Endothelial lineage", "PECAM1",
+#'     "purple", "Fibroblast lineage", "COL1A1", "green",
+#'     cellTypeTree = lungCellTypeTree)
 #' @param cellSize Size of the highlighted cells, the ones drawn in colour. The
 #'   grey background cells always have size 0.7.
 #' @name plotMarkerSpatial
@@ -469,20 +467,16 @@ plotTwoMarkerSpatial = function(spe, imageID,
 #'   package.
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' res = runProportionsPipeline(lungSubset, lungCellTypeTree, lungConfList,
+#'     outcomeCol = "disease_status", subject = "subject")
+#' rel = runProportionsRelativeToParentPipeline(lungSubset, lungCellTypeTree,
+#'     lungConfList, outcomeCol = "disease_status", subject = "subject")
 #' if (requireNamespace("ggiraph", quietly = TRUE)) {
-#'     res = runProportionsPipeline(spe, heartCellTypeTree, confList,
-#'         outcomeCol = "resolution_broad", subject = "subject")
-#'     plotProportionBoxplot(res, "CD8+ T cells", spe, "resolution_broad")
-#'
-#'     rel = runProportionsRelativeToParentPipeline(spe, heartCellTypeTree,
-#'         confList, outcomeCol = "resolution_broad", subject = "subject")
-#'     plotProportionBoxplot(rel, "CD8+ T cells", spe, "resolution_broad")
-#' }
+#'     plotProportionBoxplot(res, "Arteriole", lungSubset, "disease_status")
+#'     plotProportionBoxplot(rel, "Arteriole", lungSubset, "disease_status")
 #' }
 #' @export
 plotProportionBoxplot = function(results, cellType, spe, outcomeCol) {
@@ -574,17 +568,16 @@ proportionBoxplotGG = function(results, cellType, cells, outcomeCol) {
 #'
 #' @examples
 #' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' res = runColocalisationModels(lungSubset, lungCellTypeTree, lungConfList,
+#'     outcomeCol = "disease_status", subject = "subject")
 #' if (requireNamespace("ggiraph", quietly = TRUE)) {
-#'     res = runColocalisationModels(spe, heartCellTypeTree, confList,
-#'         outcomeCol = "resolution_broad", subject = "subject")
-#'     plotMetricBoxplot(res, spe, "CD8+ T cells", "Macrophages",
-#'         outcomeCol = "resolution_broad")
-#'     plotMetricBoxplot(res, spe, "CD8+ T cells", "Macrophages",
-#'         outcomeCol = "resolution_broad", metric = "kontextual")
+#'     plotMetricBoxplot(res, lungSubset, "Mast", "Proliferating FBs",
+#'         outcomeCol = "disease_status")
+#'     plotMetricBoxplot(res, lungSubset, "Mast", "Proliferating FBs",
+#'         outcomeCol = "disease_status", metric = "kontextual")
 #' }
 #' }
 #' @export
@@ -698,25 +691,22 @@ metricBoxplotGG = function(results, cells, fromType, toType, outcomeCol, metric)
 #'   result of [pheatmap::pheatmap()].
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' data(heartCellTypeTree)
-#' confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-#'     seed = 1)
-#' niches = runNicheIdentification(spe, heartCellTypeTree, confList,
-#'     r = c(20, 50), k = 5)
-#' plotNicheSpatial(spe, unique(spe$imageID)[1], "niche1",
+#' data(lungSubset)
+#' data(lungCellTypeTree)
+#' data(lungConfList)
+#' niches = runNicheIdentification(lungSubset, lungCellTypeTree, lungConfList,
+#'     r = 50, k = 6)
+#' plotNicheSpatial(lungSubset, "VUHD113", "niche1",
 #'     nicheCol = niches$nicheWeighted)
-#' nicheCompositionMap(spe, niches$nicheWeighted)
-#' nicheBarplot(spe, niches$nicheWeighted, "niche1")
+#' nicheCompositionMap(lungSubset, niches$nicheWeighted)
+#' nicheBarplot(lungSubset, niches$nicheWeighted, "niche1")
+#' res = testNicheOutcome(lungSubset, niches$nicheUnweighted,
+#'     niches$nicheWeighted, outcomeCol = "disease_status", subject = "subject")
 #' if (requireNamespace("ggiraph", quietly = TRUE)) {
-#'     res = testNicheOutcome(spe, niches$nicheUnweighted,
-#'         niches$nicheWeighted, outcomeCol = "resolution_broad",
-#'         subject = "subject")
-#'     nicheProportionBoxplot(res$propWeighted, "niche1", spe, "resolution_broad")
-#'     nicheProportionBoxplot(res$propUnweighted, "niche1", spe,
-#'         "resolution_broad")
-#' }
+#'     nicheProportionBoxplot(res$propWeighted, "niche1", lungSubset,
+#'         "disease_status")
+#'     nicheProportionBoxplot(res$propUnweighted, "niche1", lungSubset,
+#'         "disease_status")
 #' }
 #' @param cellSize Size of the highlighted cells in `plotNicheSpatial()`, the
 #'   cells of the chosen niche. The grey background cells always have size 0.7.

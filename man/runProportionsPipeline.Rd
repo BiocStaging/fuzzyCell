@@ -86,22 +86,16 @@ the broad lineage). For cell types without a group and for the group-level
 proportions it is the cell type or group itself.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-    seed = 1)
-res = runProportionsPipeline(spe, heartCellTypeTree, confList,
-    outcomeCol = "resolution_broad", subject = "subject")
+data(lungSubset)
+data(lungCellTypeTree)
+data(lungConfList)
+res = runProportionsPipeline(lungSubset, lungCellTypeTree, lungConfList,
+    outcomeCol = "disease_status", subject = "subject")
 head(res$modelWeighted)
-}
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-    seed = 1)
-rel = runProportionsRelativeToParentPipeline(spe, heartCellTypeTree,
-    confList, outcomeCol = "resolution_broad", subject = "subject")
+data(lungSubset)
+data(lungCellTypeTree)
+data(lungConfList)
+rel = runProportionsRelativeToParentPipeline(lungSubset, lungCellTypeTree,
+    lungConfList, outcomeCol = "disease_status", subject = "subject")
 head(rel$modelWeighted)
-}
 }

@@ -15,3 +15,19 @@ test_that("generateComparisons returns all pair types", {
     expect_equal(nrow(comp$leafLeaf), nLeaves^2)
     expect_equal(nrow(comp$groupGroup), 4)
 })
+
+test_that("localSeed draws from the seed and restores the session's random state", {
+    f = function(seed) {
+        fuzzyCell:::localSeed(seed)
+        stats::runif(2)
+    }
+    set.seed(99)
+    drawn = f(1)
+    expect_equal(stats::runif(1), {set.seed(99); stats::runif(1)})
+    expect_equal(drawn, {set.seed(1); stats::runif(2)})
+    # a seeded analysis leaves the user's random numbers unchanged too
+    d = miniPipelineData()
+    set.seed(99)
+    suppressMessages(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 2, seed = 1))
+    expect_equal(stats::runif(1), {set.seed(99); stats::runif(1)})
+})

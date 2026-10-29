@@ -71,24 +71,21 @@ niche. \code{nicheProportionBoxplot()} compares a niche's per-image proportion
 between outcome groups.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
-    seed = 1)
-niches = runNicheIdentification(spe, heartCellTypeTree, confList,
-    r = c(20, 50), k = 5)
-plotNicheSpatial(spe, unique(spe$imageID)[1], "niche1",
+data(lungSubset)
+data(lungCellTypeTree)
+data(lungConfList)
+niches = runNicheIdentification(lungSubset, lungCellTypeTree, lungConfList,
+    r = 50, k = 6)
+plotNicheSpatial(lungSubset, "VUHD113", "niche1",
     nicheCol = niches$nicheWeighted)
-nicheCompositionMap(spe, niches$nicheWeighted)
-nicheBarplot(spe, niches$nicheWeighted, "niche1")
+nicheCompositionMap(lungSubset, niches$nicheWeighted)
+nicheBarplot(lungSubset, niches$nicheWeighted, "niche1")
+res = testNicheOutcome(lungSubset, niches$nicheUnweighted,
+    niches$nicheWeighted, outcomeCol = "disease_status", subject = "subject")
 if (requireNamespace("ggiraph", quietly = TRUE)) {
-    res = testNicheOutcome(spe, niches$nicheUnweighted,
-        niches$nicheWeighted, outcomeCol = "resolution_broad",
-        subject = "subject")
-    nicheProportionBoxplot(res$propWeighted, "niche1", spe, "resolution_broad")
-    nicheProportionBoxplot(res$propUnweighted, "niche1", spe,
-        "resolution_broad")
-}
+    nicheProportionBoxplot(res$propWeighted, "niche1", lungSubset,
+        "disease_status")
+    nicheProportionBoxplot(res$propUnweighted, "niche1", lungSubset,
+        "disease_status")
 }
 }

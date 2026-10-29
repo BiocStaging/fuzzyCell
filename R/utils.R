@@ -17,10 +17,8 @@
 #' @return A `data.frame` with one row per cell.
 #'
 #' @examples
-#' \donttest{
-#' spe = loadAmancherla("pre")
-#' head(getCellData(spe))
-#' }
+#' data(lungSubset)
+#' head(getCellData(lungSubset))
 #' @export
 getCellData = function(spe) {
     cells = as.data.frame(SummarizedExperiment::colData(spe))
@@ -88,6 +86,21 @@ cellDataNames = function(x) {
     } else {
         names(x)
     }
+}
+
+# Draws the rest of the calling function's random numbers from `seed` (unless it
+# is NULL), and restores the session's random state when that function returns,
+# so that a seed given to a fuzzyCell function leaves the user's own random
+# numbers unchanged. The draws are the same as after set.seed(seed).
+localSeed = function(seed, envir = parent.frame()) {
+    if (is.null(seed)) return(invisible())
+    hadSeed = exists(".Random.seed", globalenv(), inherits = FALSE)
+    old = if (hadSeed) get(".Random.seed", globalenv())
+    withr::defer(
+        if (hadSeed) assign(".Random.seed", old, globalenv()) else rm(".Random.seed", envir = globalenv()),
+        envir = envir)
+    assign(".Random.seed", withr::with_seed(seed, get(".Random.seed", globalenv())), globalenv())
+    invisible()
 }
 
 # checks that `value`, the argument called `arg`, is a single string naming a

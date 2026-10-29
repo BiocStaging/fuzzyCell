@@ -73,13 +73,9 @@ re-predicts its class. The fraction of resamples assigning a cell to each
 class is its confidence for that class.
 }
 \examples{
-\donttest{
-spe = loadAmancherla("pre")
-data(heartCellTypeTree)
-cells = annotateCellTypeTree(getCellData(spe), heartCellTypeTree)
-idx = which(cells$group \%in\% "T cells")
-countMat = t(SummarizedExperiment::assay(spe, "counts")[, idx])
-freq = bootstrapClassify(countMat, cells$cellType[idx], nBoot = 10, seed = 1)
+data(lungSubset)
+endo = lungSubset$cellType \%in\% c("Arteriole", "Venous", "Capillary", "Lymphatic")
+countMat = t(as.matrix(SummarizedExperiment::assay(lungSubset, "counts")[, endo]))
+freq = bootstrapClassify(countMat, lungSubset$cellType[endo], nBoot = 5, seed = 1)
 head(freq)
-}
 }
