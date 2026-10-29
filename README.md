@@ -92,3 +92,12 @@ See `vignette("fuzzyCell")` for a full walkthrough.
 
 Please report bugs and requests at
 <https://github.com/shreyarajeshrao/fuzzyCell/issues>.
+
+## Development
+
+Parts of fuzzyCell (package code, tests, documentation and the vignette) were
+written with the assistance of Claude (Anthropic), via Claude Code, in line with
+Bioconductor's [AI and third-party code
+policy](https://contributions.bioconductor.org/ai-policy-third-party.html). All
+code has been reviewed and tested by the maintainer, who is responsible for its
+correctness and maintenance.
