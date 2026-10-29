@@ -165,6 +165,15 @@ test_that("the niche plots take a named niche vector as well as a column", {
         "`niche = \"niche9\"` is not a niche in `nicheCol`")
 })
 
+test_that("the interactive plots embed no font files", {
+    skip_if_not_installed("ggiraph")
+    w = fuzzyCell:::interactivePlot(ggplot2::ggplot(cells, ggplot2::aes(x, y)) + ggplot2::geom_point())
+    deps = unlist(lapply(w$dependencies, function(d) d$name))
+    expect_false(any(grepl("liberation|font", deps)))
+    expect_match(w$x$html, "font-family='Liberation Sans, Arial, Helvetica, sans-serif'", fixed = TRUE)
+    expect_false(grepl("font-family='Liberation Sans'", w$x$html, fixed = TRUE))
+})
+
 ## ---- plotMetricBoxplot ----------------------------------------------------------
 test_that("plotMetricBoxplot takes lfunction or kontextual", {
     skip_if_not_installed("ggiraph")

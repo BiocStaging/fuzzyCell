@@ -8,5 +8,6 @@
 ^TEST\.qmd$
 ^TEST_files$
 ^TEST\.html$
+^TEST\.knit\.md$
 ^\.quarto$
 ^\.git$

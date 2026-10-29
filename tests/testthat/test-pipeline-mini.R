@@ -55,7 +55,7 @@ test_that("the random forest does not depend on the number of cores", {
         quiet(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 3, seed = 1, classifier = "rf", ntree = 50,
             cores = 1)),
         quiet(bootstrapLineageConfidence(d$spe, d$tree, nBoot = 3, seed = 1, classifier = "rf", ntree = 50,
-            cores = 3)))
+            cores = 2)))
 })
 
 test_that("parallel workers run BLAS on one thread, and the session's setting is restored", {

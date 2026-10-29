@@ -4,6 +4,20 @@
 # getSubtypeWeight() and getTwoLineageWeightDF() are internal helpers for the
 # confidence maps.
 
+# makes a ggplot interactive with ggiraph. By default girafe() embeds the font
+# files it measured the text with, several MB in every HTML page; here the text
+# is measured with Liberation Sans, which gdtools ships, and drawn by the
+# browser with Liberation Sans or a metric-compatible system font, so nothing
+# is embedded
+interactivePlot = function(p) {
+    fonts = gdtools::font_set(sans = gdtools::font_liberation("sans"))
+    fonts$dependencies = list()
+    widget = ggiraph::girafe(ggobj = p, height_svg = 3.5, font_set = fonts)
+    widget$x$html = gsub("font-family='Liberation Sans'",
+        "font-family='Liberation Sans, Arial, Helvetica, sans-serif'", widget$x$html, fixed = TRUE)
+    widget
+}
+
 # relabel everything in a lineage to a specific subtype
 relabelLineage = function(speSub, group, newLabel) {
     if (is.null(speSub$misclassType)) speSub$misclassType = speSub$cellType
@@ -474,7 +488,7 @@ plotTwoMarkerSpatial = function(spe, imageID,
 plotProportionBoxplot = function(results, cellType, spe, outcomeCol) {
     checkSpe(spe)
     p = proportionBoxplotGG(results, cellType, getCellData(spe), outcomeCol)
-    ggiraph::girafe(ggobj = p, height_svg = 3.5)
+    interactivePlot(p)
 }
 
 # the ggplot behind plotProportionBoxplot(), before it is made interactive
@@ -579,7 +593,7 @@ plotMetricBoxplot = function(results, spe, fromType, toType, outcomeCol,
     checkSpe(spe)
     metric = match.arg(metric)
     p = metricBoxplotGG(results, getCellData(spe), fromType, toType, outcomeCol, metric)
-    ggiraph::girafe(ggobj = p, height_svg = 3.5)
+    interactivePlot(p)
 }
 
 # the ggplot behind plotMetricBoxplot(), before it is made interactive
@@ -805,7 +819,7 @@ nicheBarplot = function(spe, niche, target, cellType = "cellType", limit = c(0.3
 nicheProportionBoxplot = function(proportions, niche, spe, outcomeCol) {
     checkSpe(spe)
     p = nicheProportionBoxplotGG(proportions, niche, getCellData(spe), outcomeCol)
-    ggiraph::girafe(ggobj = p, height_svg = 3.5)
+    interactivePlot(p)
 }
 
 # the ggplot behind nicheProportionBoxplot(), before it is made interactive
