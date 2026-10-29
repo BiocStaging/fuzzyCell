@@ -1,4 +1,4 @@
-# fuzzyCell
+# fuzzyCell <img src="man/figures/logo.png" align="right" height="139" alt="fuzzyCell logo" />
 
 Cell type labels in spatial single-cell data are uncertain, particularly between
 closely related subtypes (for example CD4+ and CD8+ T cells), but most
