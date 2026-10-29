@@ -153,6 +153,18 @@ test_that("the niche plots check their columns and niche", {
         "`target` must be one of the niches in `nicheWeighted`: niche1, niche2, niche3")
 })
 
+test_that("the niche plots take a named niche vector as well as a column", {
+    vec = niches$nicheWeighted
+    expect_equal(nicheCompositionMap(spe, vec)$data, nicheCompositionMap(spe, "nicheWeighted")$data)
+    expect_equal(nicheBarplot(spe, vec, "niche1")$data, nicheBarplot(spe, "nicheWeighted", "niche1")$data)
+    expect_equal(lapply(plotNicheSpatial(spe, "img1", "niche1", nicheCol = vec)$layers, function(l) nrow(l$data)),
+        lapply(plotNicheSpatial(spe, "img1", "niche1")$layers, function(l) nrow(l$data)))
+    expect_error(nicheCompositionMap(spe, c(a = "niche1")),
+        "`niche` must be a column of the data or a vector of niches named by cell ID")
+    expect_error(plotNicheSpatial(spe, "img1", "niche9", nicheCol = vec),
+        "`niche = \"niche9\"` is not a niche in `nicheCol`")
+})
+
 ## ---- plotMetricBoxplot ----------------------------------------------------------
 test_that("plotMetricBoxplot takes lfunction or kontextual", {
     skip_if_not_installed("ggiraph")

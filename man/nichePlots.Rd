@@ -24,19 +24,20 @@ nicheBarplot(spe, niche, target, cellType = "cellType", limit = c(0.33, 3))
 nicheProportionBoxplot(proportions, niche, spe, outcomeCol)
 }
 \arguments{
-\item{spe}{A \code{SummarizedExperiment} (e.g. a \code{SpatialExperiment}). For the
-niche plots the niche assignments need to be in \code{colData}, for example
-\code{spe$nicheWeighted = niches$nicheWeighted[spe$cellID]}; the other plots
-need the cell type, image and coordinates in the form given by
+\item{spe}{A \code{SummarizedExperiment} (e.g. a \code{SpatialExperiment}) with the
+cell type, image and coordinates of every cell in the form given by
 \code{\link[=getCellData]{getCellData()}}.}
 
 \item{imageID}{The image to plot.}
 
 \item{niche}{For \code{plotNicheSpatial()} and the proportion boxplot, the niche
-to show. For \code{nicheCompositionMap()} and \code{nicheBarplot()}, the name of the
-\code{colData} column holding niche labels.}
+to show. For \code{nicheCompositionMap()} and \code{nicheBarplot()}, the niche
+assignments: either a vector of niches named by cell ID, such as
+\code{niches$nicheWeighted} from \code{\link[=runNicheIdentification]{runNicheIdentification()}}, or the name of a
+\code{colData} column holding them.}
 
-\item{nicheCol}{Column of \code{colData(spe)} with niche assignments.}
+\item{nicheCol}{The niche assignments for \code{plotNicheSpatial()}, in either of
+the forms taken by \code{niche} in \code{nicheCompositionMap()}.}
 
 \item{cellSize}{Size of the highlighted cells in \code{plotNicheSpatial()}, the
 cells of the chosen niche. The grey background cells always have size 0.7.}
@@ -77,10 +78,10 @@ confList = bootstrapLineageConfidence(spe, heartCellTypeTree, nBoot = 10,
     seed = 1)
 niches = runNicheIdentification(spe, heartCellTypeTree, confList,
     r = c(20, 50), k = 5)
-spe$nicheWeighted = niches$nicheWeighted[spe$cellID]
-plotNicheSpatial(spe, unique(spe$imageID)[1], "niche1")
-nicheCompositionMap(spe, "nicheWeighted")
-nicheBarplot(spe, "nicheWeighted", "niche1")
+plotNicheSpatial(spe, unique(spe$imageID)[1], "niche1",
+    nicheCol = niches$nicheWeighted)
+nicheCompositionMap(spe, niches$nicheWeighted)
+nicheBarplot(spe, niches$nicheWeighted, "niche1")
 if (requireNamespace("ggiraph", quietly = TRUE)) {
     res = testNicheOutcome(spe, niches$nicheUnweighted,
         niches$nicheWeighted, outcomeCol = "resolution_broad",

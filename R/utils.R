@@ -486,14 +486,33 @@ checkSubtype = function(confList, group, subtype, arg) {
     invisible(TRUE)
 }
 
-# checks that `niche` is one of the niches in the column `nicheCol`
-checkNiche = function(cells, niche, nicheCol) {
+# niche labels for the cells: `niche` (the argument called `arg`) is either a
+# column of the cell data or a vector of niches named by cell ID, such as
+# `nicheWeighted` from runNicheIdentification(); a vector is added to the cells
+# as the column ".niche". Returns the cells and the name of the niche column.
+withNicheColumn = function(cells, niche, arg) {
+    if (is.null(names(niche))) {
+        checkColumn(cells, niche, arg)
+        return(list(cells = cells, col = niche))
+    }
+    if (!any(cells$cellID %in% names(niche))) {
+        stop("`", arg, "` must be a column of the data or a vector of niches ",
+            "named by cell ID, with at least some of the cell IDs in `spe`",
+            call. = FALSE)
+    }
+    cells$.niche = unname(niche)[match(cells$cellID, names(niche))]
+    list(cells = cells, col = ".niche")
+}
+
+# checks that `niche` is one of the niches in the column `nicheCol`, which the
+# error message calls `label`
+checkNiche = function(cells, niche, nicheCol, label = nicheCol) {
     niches = sort(unique(as.character(cells[[nicheCol]][!is.na(cells[[nicheCol]])])))
     if (!is.character(niche) || length(niche) != 1 || is.na(niche)) {
         stop("`niche` must be a single niche name", call. = FALSE)
     }
     if (!niche %in% niches) {
-        stop("`niche = \"", niche, "\"` is not a niche in `", nicheCol, "`. Niches: ",
+        stop("`niche = \"", niche, "\"` is not a niche in `", label, "`. Niches: ",
             paste(niches, collapse = ", "), call. = FALSE)
     }
     invisible(niche)

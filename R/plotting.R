@@ -658,16 +658,17 @@ metricBoxplotGG = function(results, cells, fromType, toType, outcomeCol, metric)
 #' niche. `nicheProportionBoxplot()` compares a niche's per-image proportion
 #' between outcome groups.
 #'
-#' @param spe A `SummarizedExperiment` (e.g. a `SpatialExperiment`). For the
-#'   niche plots the niche assignments need to be in `colData`, for example
-#'   `spe$nicheWeighted = niches$nicheWeighted[spe$cellID]`; the other plots
-#'   need the cell type, image and coordinates in the form given by
+#' @param spe A `SummarizedExperiment` (e.g. a `SpatialExperiment`) with the
+#'   cell type, image and coordinates of every cell in the form given by
 #'   [getCellData()].
 #' @param imageID The image to plot.
 #' @param niche For `plotNicheSpatial()` and the proportion boxplot, the niche
-#'   to show. For `nicheCompositionMap()` and `nicheBarplot()`, the name of the
-#'   `colData` column holding niche labels.
-#' @param nicheCol Column of `colData(spe)` with niche assignments.
+#'   to show. For `nicheCompositionMap()` and `nicheBarplot()`, the niche
+#'   assignments: either a vector of niches named by cell ID, such as
+#'   `niches$nicheWeighted` from [runNicheIdentification()], or the name of a
+#'   `colData` column holding them.
+#' @param nicheCol The niche assignments for `plotNicheSpatial()`, in either of
+#'   the forms taken by `niche` in `nicheCompositionMap()`.
 #' @param cellType Column of `colData(spe)` with cell type labels.
 #' @param type `"bubble"` or `"heatmap"`.
 #' @param limit Lower and upper limit of the relative enrichment.
@@ -690,10 +691,10 @@ metricBoxplotGG = function(results, cells, fromType, toType, outcomeCol, metric)
 #'     seed = 1)
 #' niches = runNicheIdentification(spe, heartCellTypeTree, confList,
 #'     r = c(20, 50), k = 5)
-#' spe$nicheWeighted = niches$nicheWeighted[spe$cellID]
-#' plotNicheSpatial(spe, unique(spe$imageID)[1], "niche1")
-#' nicheCompositionMap(spe, "nicheWeighted")
-#' nicheBarplot(spe, "nicheWeighted", "niche1")
+#' plotNicheSpatial(spe, unique(spe$imageID)[1], "niche1",
+#'     nicheCol = niches$nicheWeighted)
+#' nicheCompositionMap(spe, niches$nicheWeighted)
+#' nicheBarplot(spe, niches$nicheWeighted, "niche1")
 #' if (requireNamespace("ggiraph", quietly = TRUE)) {
 #'     res = testNicheOutcome(spe, niches$nicheUnweighted,
 #'         niches$nicheWeighted, outcomeCol = "resolution_broad",
@@ -710,10 +711,11 @@ metricBoxplotGG = function(results, cells, fromType, toType, outcomeCol, metric)
 plotNicheSpatial = function(spe, imageID, niche, nicheCol = "nicheWeighted", cellSize = 1) {
     checkCellSize(cellSize)
     checkSpe(spe)
-    cells = getCellData(spe)
-    checkColumn(cells, nicheCol, "nicheCol")
+    labelled = withNicheColumn(getCellData(spe), nicheCol, "nicheCol")
+    cells = labelled$cells
+    nicheCol = labelled$col
     checkImage(cells, imageID)
-    checkNiche(cells, niche, nicheCol)
+    checkNiche(cells, niche, nicheCol, label = if (nicheCol == ".niche") "nicheCol" else nicheCol)
     imgCells = cells |> dplyr::filter(imageID == !!imageID)
 
     ggplot() +
@@ -737,12 +739,11 @@ nicheCompositionMap = function(spe, niche, cellType = "cellType", type = c("bubb
                                 limit = c(0.33, 3), ...) {
     type = match.arg(type)
     checkSpe(spe)
-    cells = getCellData(spe)
+    labelled = withNicheColumn(getCellData(spe), niche, "niche")
+    cells = labelled$cells
     checkColumn(cells, cellType, "cellType")
-    checkColumn(cells, niche, "niche")
-    df = cells[, c(cellType, niche)]
 
-    tab = table(df[[cellType]], df[[niche]])
+    tab = table(cells[[cellType]], cells[[labelled$col]])
     tab = tab / rowSums(tab) %*% t(colSums(tab)) * sum(tab)
     tabClipped = pmax(pmin(tab, limit[2]), limit[1])
 
@@ -771,15 +772,15 @@ nicheCompositionMap = function(spe, niche, cellType = "cellType", type = c("bubb
 #' @export
 nicheBarplot = function(spe, niche, target, cellType = "cellType", limit = c(0.33, 3)) {
     checkSpe(spe)
-    cells = getCellData(spe)
+    labelled = withNicheColumn(getCellData(spe), niche, "niche")
+    cells = labelled$cells
     checkColumn(cells, cellType, "cellType")
-    checkColumn(cells, niche, "niche")
-    df = cells[, c(cellType, niche)]
+    nicheName = if (labelled$col == ".niche") "niche" else niche
 
-    tab = table(df[[cellType]], df[[niche]])
+    tab = table(cells[[cellType]], cells[[labelled$col]])
     tab = tab / rowSums(tab) %*% t(colSums(tab)) * sum(tab) # same relative-enrichment formula as nicheCompositionMap
     if (!is.character(target) || length(target) != 1 || !target %in% colnames(tab)) {
-        stop("`target` must be one of the niches in `", niche, "`: ",
+        stop("`target` must be one of the niches in `", nicheName, "`: ",
             paste(colnames(tab), collapse = ", "), call. = FALSE)
     }
 
@@ -795,7 +796,7 @@ nicheBarplot = function(spe, niche, target, cellType = "cellType", limit = c(0.3
         geom_col(fill = "#2a78d6", width = 0.7) +
         geom_hline(yintercept = 1, linetype = "dashed", colour = "grey40") +
         coord_flip() +
-        labs(x = "Cell type", y = "Relative enrichment", title = paste0(target, " (", niche, ")")) +
+        labs(x = "Cell type", y = "Relative enrichment", title = if (labelled$col == ".niche") target else paste0(target, " (", niche, ")")) +
         theme_classic()
 }
 
